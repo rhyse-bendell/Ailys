@@ -1,0 +1,7 @@
+PySide6>=6.6.1
+PyMuPDF>=1.23.7
+openpyxl>=3.1.2
+openai>=1.14.2
+pandas>=1.5.0
+pydantic>=2.8
+matplotlib>=3.8

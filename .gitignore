@@ -1,0 +1,29 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+.env.*
+*.log
+
+# Qt / PySide build artifacts
+*.qt.cache
+*.qt.user
+*.pro.user
+*.qbs.user
+*.qmlproject.user
+*.pyi
+
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# Ailys outputs / caches
+outputs/
+data/
+.cache/
+.prompt_cache/
+# Any local keys or tokens
+secrets/
