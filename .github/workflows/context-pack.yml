@@ -25,6 +25,14 @@ jobs:
       - name: Build context pack
         run: python scripts/context_pack.py
 
+      - name: List build outputs (debug)
+        run: |
+          echo "Repo root:"
+          dir
+          echo ""
+          echo "dist folder (if exists):"
+          if (Test-Path dist) { dir dist } else { echo "dist not found" }
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -32,3 +40,5 @@ jobs:
           path: |
             dist/ailys-context-*.zip
             dist/CODEMAP-*.md
+          if-no-files-found: warn
+
