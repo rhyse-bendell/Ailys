@@ -16,6 +16,10 @@ venv/
 *.qmlproject.user
 *.pyi
 
+# IDEs / editors
+.idea/
+.vscode/
+
 # OS cruft
 .DS_Store
 Thumbs.db
@@ -25,5 +29,6 @@ outputs/
 data/
 .cache/
 .prompt_cache/
+
 # Any local keys or tokens
 secrets/
