@@ -1,6 +1,12 @@
 # scripts/context_pack.py
 import os
 import sys
+if sys.platform.startswith("win"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 import fnmatch
 import json
 import hashlib
