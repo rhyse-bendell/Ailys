@@ -3,8 +3,9 @@ import os
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QPushButton, QFileDialog,
     QTabWidget, QLabel, QHBoxLayout, QTextEdit, QComboBox, QProgressBar, QLineEdit,
-    QMessageBox
+    QMessageBox, QListWidget
 )
+
 from PySide6.QtCore import Qt, QThread, Signal, QTimer
 
 
@@ -94,16 +95,46 @@ class AilysGUI(QWidget):
         self.chat_log.setMinimumWidth(400)
         main_layout.addWidget(self.chat_log, 2)
 
+        # ---- Right-side persistent Approvals pane (brain label + list + controls) ----
+        right_panel = QWidget()
+        right_layout = QVBoxLayout(right_panel)
+        right_layout.setContentsMargins(6, 6, 6, 6)
+        right_layout.setSpacing(8)
+
         self.brain_label = QLabel(f"Brain: {ac.model_summary()}")
         self.brain_label.setStyleSheet("color: #666;")
-        main_layout.addWidget(self.brain_label, 0, Qt.AlignTop)
+        right_layout.addWidget(self.brain_label, 0, Qt.AlignTop)
+
+        # List of pending approvals
+        self.approvals_list = QListWidget()
+        right_layout.addWidget(self.approvals_list, 1)
+
+        # Info/status line
+        self.approvals_info = QLabel("")
+        self.approvals_info.setStyleSheet("color: #555;")
+        right_layout.addWidget(self.approvals_info)
+
+        # Controls row
+        btn_row = QHBoxLayout()
+        self.btn_approve_selected = QPushButton("Approve Selected")
+        self.btn_deny_selected = QPushButton("Deny Selected")
+        self.btn_refresh_approvals = QPushButton("Refresh")
+        btn_row.addWidget(self.btn_approve_selected)
+        btn_row.addWidget(self.btn_deny_selected)
+        btn_row.addWidget(self.btn_refresh_approvals)
+        right_layout.addLayout(btn_row)
+
+        # Wire actions to handlers (defined below)
+        self.btn_refresh_approvals.clicked.connect(self.refresh_approvals_pane)
+        self.btn_approve_selected.clicked.connect(self.approve_selected_request)
+        self.btn_deny_selected.clicked.connect(self.deny_selected_request)
+
+        # Add to the main layout with smaller stretch
+        main_layout.addWidget(right_panel, 1)
 
         # --- Tabs ---
         self.create_main_tab()
         self.create_api_config_tab()
-
-        self.create_approvals_tab()
-
 
         self.create_lit_search_tab()
         self.create_literature_tab()
@@ -121,8 +152,71 @@ class AilysGUI(QWidget):
         self.approval_timer.timeout.connect(self.check_approval_notifications)
         self.approval_timer.start(5000)  # every 5 seconds
         QTimer.singleShot(200, self.check_approval_notifications)  # kick a first poll
+        self.refresh_approvals_pane()
 
     # ----------------- Common helpers -----------------
+
+    # ---- Approvals pane helpers -------------------------------------------------
+
+    def _selected_request_id(self) -> Optional[int]:
+        item = self.approvals_list.currentItem()
+        if not item:
+            return None
+        text = item.text().strip()
+        # Format created in refresh: "[id] description"
+        try:
+            if text.startswith("[") and "]" in text:
+                return int(text[1:text.index("]")])
+        except Exception:
+            pass
+        return None
+
+    def refresh_approvals_pane(self):
+        try:
+            pending = approvals.get_pending_requests() if hasattr(approvals,
+                                                                  "get_pending_requests") else approvals.approval_queue.get_pending_requests()
+        except Exception:
+            pending = approvals.approval_queue.get_pending_requests()
+
+        self.approvals_list.clear()
+        for r in pending:
+            self.approvals_list.addItem(f"[{r.id}] {r.description}")
+
+        n = len(pending)
+        self.approvals_info.setText(f"Pending approvals: {n}" if n else "No pending approvals.")
+
+    def approve_selected_request(self):
+        rid = self._selected_request_id()
+        if rid is None:
+            self.approvals_info.setText("Select a request to approve.")
+            return
+        try:
+            # use module-level helper if present; fallback to instance
+            if hasattr(approvals, "approve_request"):
+                approvals.approve_request(rid)
+            else:
+                approvals.approval_queue.approve_request(rid)
+            self.chat_log.append(f"✅ Approved request {rid}.")
+        except Exception as e:
+            self.chat_log.append(f"❌ Approve error: {e}")
+        self.refresh_approvals_pane()
+
+    def deny_selected_request(self):
+        rid = self._selected_request_id()
+        if rid is None:
+            self.approvals_info.setText("Select a request to deny.")
+            return
+        try:
+            # use module-level helper if present; fallback to instance
+            ok = approvals.deny_request(rid) if hasattr(approvals,
+                                                        "deny_request") else approvals.approval_queue.deny_request(rid)
+            if ok is False:
+                self.chat_log.append("⚠️ Could not deny request (maybe already resolved).")
+            else:
+                self.chat_log.append(f"🚫 Denied request {rid}.")
+        except Exception as e:
+            self.chat_log.append(f"❌ Deny error: {e}")
+        self.refresh_approvals_pane()
 
     def check_approval_notifications(self):
         pending = approvals.approval_queue.get_pending_requests()
@@ -131,10 +225,10 @@ class AilysGUI(QWidget):
             self.chat_log.append(f"⚠️ {len(pending)} approval request(s) pending.")
             try:
                 self.chat_display.append(
-                    f"⚠️ Ailys: You have {len(pending)} API request(s) waiting for approval in the Approvals tab.")
+                    f"⚠️ Ailys: You have {len(pending)} API request(s) waiting in the Approvals pane.")
             except Exception:
                 pass
-        self.display_pending_approvals()
+        self.refresh_approvals_pane()
 
     def ask_ks_mode(self, title: str = "Select source mode"):
         """
@@ -495,40 +589,6 @@ class AilysGUI(QWidget):
 
         self.tabs.addTab(memory_tab, "Memory")
 
-    def create_approvals_tab(self):
-        approval_tab = QWidget()
-        layout = QVBoxLayout(approval_tab)
-
-        self.approval_refresh_button = QPushButton("Refresh Pending Approvals")
-        self.approval_refresh_button.clicked.connect(self.display_pending_approvals)
-        layout.addWidget(self.approval_refresh_button)
-
-        self.approval_log = QTextEdit()
-        self.approval_log.setReadOnly(True)
-        self.approval_log.setPlaceholderText("Pending API requests requiring approval will appear here.")
-        layout.addWidget(self.approval_log)
-
-        self.approve_next_button = QPushButton("Approve Next Request")
-        self.approve_next_button.clicked.connect(self.approve_next_request)
-        layout.addWidget(self.approve_next_button)
-
-        self.bulk_approve_input = QLineEdit()
-        self.bulk_approve_input.setPlaceholderText("Enter number to bulk approve (e.g., 10)")
-        layout.addWidget(self.bulk_approve_input)
-
-        self.bulk_approve_button = QPushButton("Bulk Approve N Requests")
-        self.bulk_approve_button.clicked.connect(self.bulk_approve_requests)
-        layout.addWidget(self.bulk_approve_button)
-
-        self.tabs.addTab(approval_tab, "Approvals")
-        # --- Self-test button (to verify queue linkage) ---
-        from tasks.approvals_selftest import queue_one
-        self.selftest_button = QPushButton("Queue Test Request")
-        layout.addWidget(self.selftest_button)
-        self.selftest_button.clicked.connect(lambda: (
-            self.chat_log.append(queue_one()),
-            self.display_pending_approvals()
-        ))
 
     def create_knowledge_space_tab(self):
         """Main KS controls (the existing 'list')."""
@@ -894,35 +954,7 @@ class AilysGUI(QWidget):
         except Exception as e:
             self.chat_log.append(f"Error loading memory: {e}")
 
-    def display_pending_approvals(self):
-        pending = approvals.approval_queue.get_pending_requests()
-        print(f"[GUI display] queue_id={id(approvals.approval_queue)} pending={len(pending)}")
-        if not pending:
-            self.approval_log.setPlainText("No pending approvals.")
-            return
-        self.approval_log.setPlainText("\n".join([f"[{r.id}] {r.description}" for r in pending]))
 
-    def approve_next_request(self):
-        print(f"[GUI approve] queue_id={id(approvals.approval_queue)}")
-
-        pending = approvals.approval_queue.get_pending_requests()
-        if pending:
-            approvals.approval_queue.approve_request(pending[0].id)
-            self.chat_log.append(f"✅ Approved request {pending[0].id}: {pending[0].description}")
-        else:
-            self.chat_log.append("⚠️ No pending requests.")
-        self.display_pending_approvals()
-
-    def bulk_approve_requests(self):
-        print(f"[GUI bulk-approve] queue_id={id(approvals.approval_queue)}")
-
-        try:
-            count = int(self.bulk_approve_input.text().strip())
-            approvals.approval_queue.approve_batch(count)
-            self.chat_log.append(f"✅ Approved next {count} requests.")
-        except ValueError:
-            self.chat_log.append("⚠️ Invalid number entered.")
-        self.display_pending_approvals()
 
     def create_chat_tab(self):
         chat_tab = QWidget()
