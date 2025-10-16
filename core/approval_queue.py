@@ -1,6 +1,7 @@
 import os
 import threading
 import queue
+import time
 from dataclasses import dataclass, field
 from typing import Callable, Optional, List, Any
 
@@ -92,8 +93,15 @@ class ApprovalQueue:
         # Block until approved or denied (or timeout)
         with req.condition:
             print(f"[request_approval] waiting on condition (timeout={timeout}) for id={req.id}")
-
-            req.condition.wait(timeout=timeout)
+            # wait until approved is no longer None, or until timeout expires
+            if timeout is None:
+                while req.approved is None:
+                    req.condition.wait(timeout=0.25)
+            else:
+                # bounded wait with small slices so we can be notified
+                end = time.time() + float(timeout)
+                while req.approved is None and time.time() < end:
+                    req.condition.wait(timeout=0.25)
 
         if req.approved:
             print(f"[request_approval] woke: id={req.id} approved={req.approved} error={req.error}")
@@ -106,12 +114,14 @@ class ApprovalQueue:
         print(f"[get_pending] pending={len(pend)} total={len(self._requests)} queue_id={id(self)}")
         return pend
 
-    def approve_request(self, request_id: int):
+    def approve_request(self, request_id: int) -> Optional[object]:
         req = self._find_request(request_id)
         if req and req.approved is None:
             with req.condition:
-                self._execute_request(req)
+                result = self._execute_request(req)
                 req.condition.notify()
+            return result
+        return None
 
     def approve_batch(self, count: int):
         """Immediately executes up to `count` queued items (manual convenience)."""
@@ -128,12 +138,14 @@ class ApprovalQueue:
     def approve_all_pending(self):
         self.approve_batch(len(self.get_pending_requests()))
 
-    def deny_request(self, request_id: int):
+    def deny_request(self, request_id: int) -> bool:
         req = self._find_request(request_id)
         if req and req.approved is None:
             req.approved = False
             with req.condition:
                 req.condition.notify()
+            return True
+        return False
 
     # -------- internals ------------------------------------------------------
 
@@ -168,13 +180,6 @@ class ApprovalQueue:
         return next((r for r in self._requests if r.id == request_id), None)
 
 
-# Global instance + shortcut function (backwards compatible)
-approval_queue = ApprovalQueue()
-
-def request_approval(description: str, call_fn: Callable[[], Any], timeout: Optional[float] = None) -> Optional[object]:
-    return approval_queue.request_approval(description, call_fn, timeout=timeout)
-
-
 # --- Hard singleton wiring (module-global) -----------------------------------
 import sys as _sys
 
@@ -187,6 +192,42 @@ else:
 
 def request_approval(description: str, call_fn: Callable[[], Any], timeout: Optional[float] = None) -> Optional[object]:
     return approval_queue.request_approval(description, call_fn, timeout=timeout)
+
+# === Ailys patch: module-level re-exports for GUI/use (START) ===
+
+def get_pending_requests() -> List[ApprovalRequest]:
+    """Return the list of pending ApprovalRequest objects."""
+    return approval_queue.get_pending_requests()
+
+def get_pending_requests_summary() -> List[dict]:
+    """Lightweight dicts for GUI list rendering: id, description, created order."""
+    items = []
+    for r in approval_queue.get_pending_requests():
+        items.append({
+            "id": r.id,
+            "description": r.description,
+            "approved": r.approved,  # always None here by definition
+        })
+    return items
+
+def approve_request(request_id: int) -> Optional[object]:
+    """Approve a specific pending request by id and execute it."""
+    return approval_queue.approve_request(request_id)
+
+def deny_request(request_id: int) -> bool:
+    """Deny a specific pending request by id (does not execute the call)."""
+    return approval_queue.deny_request(request_id)
+
+def approve_batch(count: int) -> None:
+    """Approve/execute up to count pending requests (manual convenience)."""
+    return approval_queue.approve_batch(count)
+
+def approve_all_pending() -> None:
+    """Approve/execute all pending requests."""
+    return approval_queue.approve_all_pending()
+
+# === Ailys patch: module-level re-exports for GUI/use (END) ===
+
 
 # Optional: quick identity check for debugging
 def _debug_id() -> str:
