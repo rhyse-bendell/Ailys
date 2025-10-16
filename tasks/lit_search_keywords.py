@@ -9,9 +9,9 @@ from core.lit.utils import (
     make_run_id, run_dirs, write_csv_row, read_single_row_csv, from_list
 )
 
-# IMPORTANT: import the MODULE, not a function copy.
-# This guarantees we talk to the same queue object the GUI uses.
-import core.approval_queue as approvals
+# Route ALL cognition through Ailys' central brain (approval-gated internally).
+from core import artificial_cognition as brain
+
 
 
 CSV_HEADER = [
@@ -82,61 +82,6 @@ def _build_messages(prompt: str, clarifications: str):
     ]
 
 
-def _call_gpt(messages: List[Dict[str, str]]) -> str:
-    """
-    Enqueue approval BEFORE touching secrets. After approval, read the key and
-    call OpenAI with a timeout. Any problem is surfaced as a clear error that
-    bubbles up to the GUI via the thread's exception handler.
-    """
-
-    def _do_call():
-        # Only after approval do we attempt to read secrets / call OpenAI.
-        try:
-            from openai import OpenAI
-        except Exception as e:
-            return f"__ERROR__: OpenAI SDK not available: {e}"
-
-        key = os.getenv("OPENAI_API_KEY")
-        if not key:
-            return "__ERROR__: OPENAI_API_KEY is not set. Open the Config tab to add it."
-
-        try:
-            # Prefer setting timeout on the client to avoid SDK kwargs mismatch.
-            client = OpenAI(api_key=key, timeout=45)  # seconds
-            resp = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=messages,
-                temperature=0.2,
-            )
-            content = resp.choices[0].message.content
-            return content if content else "__ERROR__: Empty response from OpenAI."
-        except Exception as e:
-            return f"__ERROR__: OpenAI call failed: {e}"
-
-    # --- Diagnostics so you can see exactly what's happening -----------------
-    mode = (os.getenv("AILYS_APPROVAL_MODE") or "manual").strip().lower()
-    try:
-        print("TASK approval queue:", approvals._debug_id(), approvals._debug_counts(), flush=True)
-    except Exception:
-        # _debug helpers may not exist in older builds; that's fine.
-        print(f"TASK approval queue: mode={mode}", flush=True)
-
-    # --- Gate via approval queue; no key access yet. -------------------------
-    result = approvals.request_approval(
-        description="Use OpenAI to generate literature-search keywords/queries (cost: a few cents).",
-        call_fn=_do_call,
-        # No timeout here — this runs on a worker thread, so it's safe to wait.
-        # (If you prefer a timeout, set a value and treat None as "not approved".)
-        timeout=None,
-    )
-
-    # If the call function returned an error string, raise so the GUI shows ❌
-    if isinstance(result, str) and result.startswith("__ERROR__"):
-        raise RuntimeError(result)
-    if not result:
-        raise RuntimeError("Approval declined or failed; no result returned.")
-    return result
-
 
 def _parse_json_block(text: str) -> Dict[str, List[str]]:
     """
@@ -188,9 +133,17 @@ def run(
         if row and row.get("clarifications"):
             clarifications = row.get("clarifications", "")
 
-    # Call LLM (approval-gated). The GUI should show that we're waiting.
-    print("Awaiting approval: 'Generate Keywords' request is queued in the Approvals tab.", flush=True)
-    llm_reply = _call_gpt(_build_messages(prompt=prompt, clarifications=clarifications))
+    # Call LLM via central brain (approval-gated internally).
+    print("Awaiting approval: 'Generate Keywords' request is queued in the Approvals pane.", flush=True)
+    resp = brain.ask(
+        messages=_build_messages(prompt=prompt, clarifications=clarifications),
+        description="Literature Search: generate keywords and boolean queries",
+        temperature=0.2,
+        timeout=None,  # wait until you approve in the pane
+    )
+    llm_reply = resp.raw_text
+    if not llm_reply:
+        raise RuntimeError("Empty model response.")
 
     parsed = _parse_json_block(llm_reply)
 
@@ -213,3 +166,72 @@ def run(
     }, CSV_HEADER)
 
     return True, f"CSV written: {out_csv}"
+
+# ==== Augment an existing keywords CSV (START) ====
+def augment_keywords_csv(
+    existing_csv_path: str,
+    clarification_prompt: str,
+    output_csv_path: str,
+    researcher: str = ""
+) -> str:
+    """
+    Read an existing keywords CSV (CSV-1) and ask the central brain to augment/amend it
+    based on a new clarification prompt. The brain is approval-gated internally.
+    Writes a fully updated CSV (including header) to output_csv_path and returns that path.
+    """
+    if not os.path.exists(existing_csv_path):
+        raise FileNotFoundError(existing_csv_path)
+
+    with open(existing_csv_path, "r", encoding="utf-8") as f:
+        existing_csv_text = f.read()
+
+    system = (
+        "You are Ailys, assisting with literature search term design.\n"
+        "You will be given an existing keywords CSV and a new clarification.\n\n"
+        "Your task:\n"
+        "• Update/amend the CSV to reflect the clarification.\n"
+        "• Preserve the exact header and column order from the original CSV.\n"
+        "• Keep existing useful rows; add/modify/remove rows only as needed to improve precision/recall.\n"
+        "• Remove duplicates; preserve notes if present.\n\n"
+        "Output rules:\n"
+        "• Return a COMPLETE CSV including the header row.\n"
+        "• Do NOT return JSON or prose, only CSV text.\n"
+        "• Use ';' as the list separator inside the '*|;|' columns, same as the original.\n"
+    )
+
+    user = (
+        f"Existing CSV (verbatim):\n{existing_csv_text}\n\n"
+        f"Clarification / update from researcher '{researcher or 'Researcher'}':\n{clarification_prompt}\n\n"
+        "Please return ONLY the updated CSV (with header)."
+    )
+
+    resp = brain.ask(
+        messages=[{"role": "system", "content": system},
+                  {"role": "user", "content": user}],
+        description="Literature Search: augment existing keywords CSV",
+        temperature=0.2,
+        timeout=None,
+    )
+
+    updated_csv = (resp.raw_text or "").strip()
+
+    # Rudimentary validity checks
+    if not updated_csv or "," not in updated_csv or "\n" not in updated_csv:
+        raise ValueError("Model did not return a plausible CSV (missing commas/lines).")
+
+    # Optional: very light header compatibility check (non-fatal)
+    try:
+        header_line = updated_csv.splitlines()[0].strip().lower()
+        required_bits = ["run_id", "timestamp_utc", "researcher", "prompt",
+                         "seed_terms|;|", "expanded_terms|;|", "boolean_queries|;|"]
+        if not all(bit in header_line for bit in required_bits):
+            # Keep writing but you may enforce stricter checks here
+            pass
+    except Exception:
+        pass
+
+    with open(output_csv_path, "w", encoding="utf-8", newline="") as f:
+        f.write(updated_csv)
+
+    return output_csv_path
+

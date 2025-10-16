@@ -390,83 +390,113 @@ class AilysGUI(QWidget):
     # def toggle_api_secrets(self): ...
 
     def create_lit_search_tab(self):
-        """Creates the Literature Search tab with Stage A–B functionality."""
+        """Creates the Literature Search tab with Stage A–B functionality (flow-ordered)."""
 
         from PySide6.QtWidgets import (
             QWidget, QVBoxLayout, QLabel, QTextEdit,
-            QLineEdit, QPushButton, QFileDialog
+            QLineEdit, QPushButton, QFileDialog, QGroupBox, QHBoxLayout
         )
 
         tab = QWidget()
         layout = QVBoxLayout(tab)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
 
-        # ---- Researcher Name ----------------------------------------------------
-        layout.addWidget(QLabel("Researcher"))
+        # 1) Researcher name ---------------------------------------------------------
+        researcherBox = QGroupBox("Researcher")
+        rLay = QHBoxLayout(researcherBox)
         self.ls_researcher = QLineEdit()
         self.ls_researcher.setPlaceholderText("Enter your display name (e.g., Jess)")
-        layout.addWidget(self.ls_researcher)
+        rLay.addWidget(QLabel("Name:"))
+        rLay.addWidget(self.ls_researcher)
+        layout.addWidget(researcherBox)
 
-        # ---- Research Prompt ----------------------------------------------------
-        layout.addWidget(QLabel("Literature Search Prompt"))
+        # 2) Search prompt -> generate keywords CSV ---------------------------------
+        genBox = QGroupBox("Search Prompt → Generate Keywords (CSV-1)")
+        gLay = QVBoxLayout(genBox)
         self.ls_prompt = QTextEdit()
         self.ls_prompt.setPlaceholderText(
             "Describe your literature search goal...\n"
             "Example: I need to find literature on neurodiversity in teams, "
             "especially where AI supports collaboration or task performance."
         )
-        layout.addWidget(self.ls_prompt)
+        self.btn_ls_keywords = QPushButton("Generate Keywords (CSV-1)")
+        gLay.addWidget(QLabel("Prompt:"))
+        gLay.addWidget(self.ls_prompt)
+        gLay.addWidget(self.btn_ls_keywords)
+        layout.addWidget(genBox)
 
-        # ---- Optional Clarifications CSV (Stage A) ------------------------------
-        layout.addWidget(QLabel("Optional: Clarifications CSV (to merge with prompt)"))
-        self.ls_clar_csv = QLineEdit()
-        self.ls_clar_csv.setPlaceholderText("Path to existing prompt_to_keywords.csv (optional)")
-        layout.addWidget(self.ls_clar_csv)
+        # 3) Augment an existing keywords CSV with a new clarification ---------------
+        augBox = QGroupBox("Augment Existing Keywords CSV")
+        aLay = QVBoxLayout(augBox)
 
-        btn_browse_clar = QPushButton("Browse…")
+        # File picker row
+        fRow = QHBoxLayout()
+        self.ls_aug_csv_path = QLineEdit()
+        self.ls_aug_csv_path.setPlaceholderText("Path to existing prompt_to_keywords.csv")
+        btn_browse_aug = QPushButton("Browse…")
+        fRow.addWidget(QLabel("Existing CSV:"))
+        fRow.addWidget(self.ls_aug_csv_path)
+        fRow.addWidget(btn_browse_aug)
+        aLay.addLayout(fRow)
 
-        def browse_clar():
-            path, _ = QFileDialog.getOpenFileName(self, "Select Clarifications CSV", "", "CSV Files (*.csv)")
-            if path:
-                self.ls_clar_csv.setText(path)
+        # Clarification text
+        self.ls_aug_text = QTextEdit()
+        self.ls_aug_text.setPlaceholderText(
+            "Add clarification or updates to refine/amend the existing keywords and queries."
+        )
+        aLay.addWidget(QLabel("Additional Clarification / Update:"))
+        aLay.addWidget(self.ls_aug_text)
 
-        btn_browse_clar.clicked.connect(browse_clar)
-        layout.addWidget(btn_browse_clar)
+        self.btn_ls_augment = QPushButton("Augment Keywords CSV")
+        aLay.addWidget(self.btn_ls_augment)
+        layout.addWidget(augBox)
 
-        # ---- CSV-1 Path (for Stage B) ------------------------------------------
-        layout.addWidget(QLabel("CSV-1: prompt_to_keywords.csv (for Stage B collection)"))
+        # 4) Manuscript collection using a chosen keywords CSV -----------------------
+        colBox = QGroupBox("Collect Manuscripts (Guided by Keywords CSV)")
+        cLay = QVBoxLayout(colBox)
+
+        cRow = QHBoxLayout()
         self.ls_csv1_path = QLineEdit()
-        self.ls_csv1_path.setPlaceholderText("Path to prompt_to_keywords.csv")
-        layout.addWidget(self.ls_csv1_path)
-
+        self.ls_csv1_path.setPlaceholderText("Path to keywords CSV to use for collection")
         btn_browse_csv1 = QPushButton("Browse…")
+        cRow.addWidget(QLabel("Keywords CSV:"))
+        cRow.addWidget(self.ls_csv1_path)
+        cRow.addWidget(btn_browse_csv1)
+        cLay.addLayout(cRow)
 
-        def browse_csv1():
-            path, _ = QFileDialog.getOpenFileName(self, "Select prompt_to_keywords.csv", "", "CSV Files (*.csv)")
-            if path:
-                self.ls_csv1_path.setText(path)
+        self.btn_ls_collect = QPushButton("Request Approval & Start Collection (CSV-2)")
+        cLay.addWidget(self.btn_ls_collect)
+        layout.addWidget(colBox)
 
-        btn_browse_csv1.clicked.connect(browse_csv1)
-        layout.addWidget(btn_browse_csv1)
-
-        # ---- Buttons ------------------------------------------------------------
-        self.btn_ls_keywords = QPushButton("1) Generate Keywords (CSV-1)")
-        self.btn_ls_collect = QPushButton("2) Collect Results (CSV-2)")
-        self.btn_ls_filter = QPushButton("3) Filter to Consider (CSV-3)")
+        # Optional future steps
+        self.btn_ls_filter = QPushButton("Filter to Consider (CSV-3)")
+        self.btn_ls_filter.setEnabled(False)
         self.btn_ls_open = QPushButton("Open Output Folder")
-
-        layout.addWidget(self.btn_ls_keywords)
-        layout.addWidget(self.btn_ls_collect)
+        self.btn_ls_open.setEnabled(False)
         layout.addWidget(self.btn_ls_filter)
         layout.addWidget(self.btn_ls_open)
 
-        # ---- Connect Buttons ----------------------------------------------------
-        self.btn_ls_keywords.clicked.connect(self.run_ls_keywords)
-        self.btn_ls_collect.clicked.connect(self.run_ls_collect)
-        # Filter + Open will be added later
-        self.btn_ls_filter.setEnabled(False)
-        self.btn_ls_open.setEnabled(False)
+        # Browse handlers
+        def browse_aug_csv():
+            path, _ = QFileDialog.getOpenFileName(self, "Select prompt_to_keywords.csv", "", "CSV Files (*.csv)")
+            if path:
+                self.ls_aug_csv_path.setText(path)
 
-        # ---- Add Tab ------------------------------------------------------------
+        def browse_csv1():
+            path, _ = QFileDialog.getOpenFileName(self, "Select keywords CSV for collection", "", "CSV Files (*.csv)")
+            if path:
+                self.ls_csv1_path.setText(path)
+
+        btn_browse_aug.clicked.connect(browse_aug_csv)
+        btn_browse_csv1.clicked.connect(browse_csv1)
+
+        # Wire actions
+        self.btn_ls_keywords.clicked.connect(self.run_ls_keywords)
+        self.btn_ls_augment.clicked.connect(self.run_ls_augment)
+        self.btn_ls_collect.clicked.connect(self.run_ls_collect)
+
+        # Add Tab
         self.tabs.addTab(tab, "Lit Search")
 
     # =========================================================================== #
@@ -494,6 +524,33 @@ class AilysGUI(QWidget):
                 researcher=researcher
             )
             return ok, msg
+
+        self.thread = TaskRunnerThread(_task)
+        self.thread.update_status.connect(self.chat_log.append)
+        self.thread.finished.connect(self.task_finished_with_result)
+        self.thread.start()
+
+    def run_ls_augment(self):
+        """Augment an existing keywords CSV using a new clarification prompt."""
+        existing_csv = self.ls_aug_csv_path.text().strip()
+        clar = self.ls_aug_text.toPlainText().strip()
+        researcher = self.ls_researcher.text().strip() or "Researcher"
+
+        if not existing_csv:
+            self.chat_log.append("⚠️ Please select the existing keywords CSV to augment.")
+            return
+        if not clar:
+            self.chat_log.append("⚠️ Please enter a clarification/update to guide the augmentation.")
+            return
+
+        self.chat_log.append(
+            "⏳ Waiting for your approval: use the Approvals pane (right side) to allow 'Augment Keywords'.")
+
+        def _task():
+            from tasks.lit_search_keywords import augment_keywords_csv
+            out_path = existing_csv + ".updated.csv"
+            ok_path = augment_keywords_csv(existing_csv, clar, out_path, researcher=researcher)
+            return True, f"CSV written: {ok_path}"
 
         self.thread = TaskRunnerThread(_task)
         self.thread.update_status.connect(self.chat_log.append)

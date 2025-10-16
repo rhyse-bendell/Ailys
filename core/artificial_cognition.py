@@ -12,6 +12,12 @@ import os
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Union
 
+# persistence & memory
+from pathlib import Path
+from datetime import datetime
+import uuid
+from memory.memory import save_memory_event
+
 # Always import the module so we share the SAME singleton queue with GUI
 import core.approval_queue as approvals
 
@@ -87,6 +93,25 @@ class CognitionResult:
     raw_text: str
     usage: Optional[Dict[str, Any]] = None   # tokens, cost, etc. if available
     provider: str = ""
+
+# --- Persistence helpers (full-fidelity exchange logs) ----------------------
+
+def _exchanges_dir() -> Path:
+    """Directory where full exchange JSON records are persisted."""
+    p = Path("memory") / "exchanges"
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+def _persist_exchange(record: Dict[str, Any]) -> str:
+    """
+    Write the full exchange record as JSON and return the absolute path.
+    """
+    ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    sid = uuid.uuid4().hex[:8]
+    path = _exchanges_dir() / f"{ts}_{sid}.json"
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(record, f, ensure_ascii=False, indent=2)
+    return str(path.resolve())
 
 # ------------------------------ Public API ---------------------------------
 
@@ -171,6 +196,58 @@ def ask(
             }
         except Exception:
             usage = None
+
+            # Persist exchange (best-effort full object + raw text)
+            # Try to capture a serializable version of the response object.
+            try:
+                # OpenAI SDK v1 objects usually support model_dump()
+                resp_dump = resp.model_dump()  # type: ignore[attr-defined]
+            except Exception:
+                try:
+                    # Some SDKs expose .to_dict()
+                    resp_dump = resp.to_dict()  # type: ignore[attr-defined]
+                except Exception:
+                    # Fallback string—still useful as a forensic breadcrumb
+                    resp_dump = str(resp)
+
+            exchange_record: Dict[str, Any] = {
+                "timestamp_utc": datetime.utcnow().isoformat(),
+                "description": description,  # captured from outer scope
+                "provider": prov,
+                "model": mdl,
+                "base_url": _base_url(),
+                "parameters": {"temperature": temp, "max_tokens": mx},
+                "messages": messages,  # exact input we sent
+                "response": resp_dump,  # best-effort full object
+                "raw_text": content,  # exact content as returned
+                "usage": usage,
+            }
+            exchange_path = _persist_exchange(exchange_record)
+
+            # Also drop a crystallized breadcrumb for later recall/analytics
+            try:
+                # Keep this tiny; no extra cognition here.
+                snippet = (content if isinstance(content, str) else str(content))[:3000]
+                save_memory_event(
+                    event_type="cognition_exchange",
+                    source_text=snippet,
+                    ai_insight=f"Exchange stored at {exchange_path}.",
+                    user_input=description,
+                    tags=[f"provider:{prov}", f"model:{mdl}", "cognition", "llm"],
+                    file_path=exchange_path,
+                )
+            except Exception:
+                # Never block the main flow on memory I/O
+                pass
+
+            # Return raw text (no strip/trim) to avoid any downstream surprises
+            return CognitionResult(
+                model_id=mdl,
+                raw_text=content if isinstance(content, str) else str(content),
+                usage=usage,
+                provider=prov
+            )
+
 
         # Return raw text (no strip/trim) to avoid any downstream surprises
         return CognitionResult(
