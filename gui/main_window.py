@@ -1,5 +1,7 @@
 import sys
 import os
+from typing import Optional
+
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QPushButton, QFileDialog,
     QTabWidget, QLabel, QHBoxLayout, QTextEdit, QComboBox, QProgressBar, QLineEdit,
@@ -473,7 +475,7 @@ class AilysGUI(QWidget):
 
     def run_ls_keywords(self):
         """Stage A – Prompt → Keywords (CSV-1)."""
-        self.chat_log.append("⏳ Waiting for your approval: open the Approvals tab to allow 'Generate Keywords'.")
+        self.chat_log.append("⏳ Waiting for your approval: use the Approvals pane (right side) to allow 'Generate Keywords'.")
 
         prompt = self.ls_prompt.toPlainText().strip()
         clar_csv = self.ls_clar_csv.text().strip() or None
