@@ -7,6 +7,11 @@ import io
 import csv
 from typing import Optional, Dict, List
 
+# Message role constants (avoid accidental NameError typos)
+ROLE_SYSTEM = "system"
+ROLE_USER = "user"
+
+
 from core.lit.utils import (
     make_run_id, run_dirs, write_csv_row, read_single_row_csv, from_list
 )
@@ -75,13 +80,19 @@ USER_TEMPLATE = (
 
 
 def _build_messages(prompt: str, clarifications: str):
-    return [
-        {"role": "system", "content": SYSTEM_HINT},
-        {"role": "user", "content": USER_TEMPLATE.format(
+    msgs = [
+        {"role": ROLE_SYSTEM, "content": SYSTEM_HINT},
+        {"role": ROLE_USER, "content": USER_TEMPLATE.format(
             prompt=(prompt or "").strip(),
             clarifications=(clarifications or "").strip()
         )},
     ]
+    # Sanity check to fail early with a clear error if a role was mistyped
+    for i, m in enumerate(msgs):
+        if not isinstance(m.get("role"), str):
+            raise ValueError(f"Message {i} has non-string role: {m.get('role')!r}")
+    return msgs
+
 
 
 
@@ -329,11 +340,12 @@ def augment_keywords_csv(
     )
 
     resp = brain.ask(
-        messages=[{"role": "system", "content": system},
-                  {"role": "user", "content": user}],
+        messages=[
+            {"role": ROLE_SYSTEM, "content": system},
+            {"role": ROLE_USER, "content": user}
+        ],
         description="Literature Search: augment existing keywords CSV",
-        temperature=None,
-        max_tokens=2000,  # plenty for a one-row CSV with lists
+        temperature=0.2,
         timeout=None,
     )
 

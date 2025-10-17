@@ -201,6 +201,15 @@ def ask(
     if messages is None:
         messages = [{"role": "user", "content": str(prompt)}]
 
+    # right after we normalize `messages`
+    for i, m in enumerate(messages):
+        if not isinstance(m, dict):
+            raise ValueError(f"messages[{i}] is not a dict: {type(m).__name__}")
+        if not isinstance(m.get("role"), str):
+            raise ValueError(f"messages[{i}].role must be a string, got: {m.get('role')!r}")
+        if "content" not in m:
+            raise ValueError(f"messages[{i}] missing 'content'")
+
     prov = _provider()
     mdl = _model()
     base_url = _base_url()
