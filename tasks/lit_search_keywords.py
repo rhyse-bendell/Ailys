@@ -3,6 +3,8 @@ import os
 import datetime
 import json
 import re
+import io
+import csv
 from typing import Optional, Dict, List
 
 from core.lit.utils import (
@@ -167,6 +169,122 @@ def run(
 
     return True, f"CSV written: {out_csv}"
 
+# --- Normalization helpers for CSV-1 schema ---------------------------------
+
+# The canonical CSV-1 header (already defined as CSV_HEADER above)
+_LIST_COLS = {"seed_terms|;|", "expanded_terms|;|", "boolean_queries|;|"}
+
+def _norm_key(k: str) -> str:
+    """
+    Normalize a column name for matching:
+    - lowercases
+    - replaces spaces with underscores
+    - strips any '|...|' list markers
+    """
+    kk = (k or "").strip().lower().replace(" ", "_")
+    # remove things like "|;|" suffixes
+    kk = re.sub(r"\|.*\|", "", kk)
+    return kk
+
+def _normalize_list_field(val: Optional[str]) -> str:
+    """
+    Accepts JSON arrays or delimited strings and emits the canonical ';' joined form
+    used by from_list().
+    """
+    if val is None:
+        return ""
+    s = str(val).strip()
+    if not s:
+        return ""
+    # JSON array?
+    if s.startswith("["):
+        try:
+            arr = json.loads(s)
+            parts = [str(x).strip() for x in arr if str(x).strip()]
+            return from_list(parts)
+        except Exception:
+            pass
+    # Delimited by ; , or |
+    parts = re.split(r"[;,|]\s*", s)
+    parts = [p.strip().strip('"').strip("'") for p in parts if p.strip()]
+    return from_list(parts)
+
+def _read_first_row_as_dict(csv_text: str) -> Dict[str, str]:
+    """
+    Try to read the first row of a CSV string into a dict (case-insensitive keys).
+    Returns {} on failure.
+    """
+    try:
+        rdr = csv.DictReader(io.StringIO(csv_text))
+        for row in rdr:
+            return row or {}
+    except Exception:
+        pass
+    return {}
+
+def _coerce_to_csv1_schema(
+    updated_csv_text: str,
+    original_row: Dict[str, str],
+    researcher_fallback: str = "Researcher"
+) -> Dict[str, str]:
+    """
+    Coerce whatever the model returned into the exact CSV-1 schema (CSV_HEADER).
+    Strategy:
+      - parse model CSV's first row (if any)
+      - build a normalized-key lookup
+      - start from original_row as base and override known fields if present
+      - ensure list columns are canonical ';' joined
+      - fill missing non-list fields from original_row; timestamp is refreshed
+    """
+    # start with original as base
+    base = dict(original_row or {})
+
+    # ensure base has minimal keys
+    for k in CSV_HEADER:
+        base.setdefault(k, "")
+
+    # refresh timestamp, keep run_id & prompt unless explicitly changed
+    base["timestamp_utc"] = datetime.datetime.utcnow().isoformat()
+    base["researcher"] = base.get("researcher") or researcher_fallback
+
+    # parse model CSV (first row)
+    model_row = _read_first_row_as_dict(updated_csv_text)
+    norm_map: Dict[str, str] = {}
+    for k, v in model_row.items():
+        norm_map[_norm_key(k)] = v
+
+    # mapping for list columns (model might omit '|;|' markers)
+    list_key_alias = {
+        "seed_terms|;|": "seed_terms",
+        "expanded_terms|;|": "expanded_terms",
+        "boolean_queries|;|": "boolean_queries",
+    }
+
+    # override from model where available
+    for col in CSV_HEADER:
+        if col in _LIST_COLS:
+            alias = list_key_alias[_norm_key(col + "")] if _norm_key(col) in list_key_alias else list_key_alias.get(col, None)
+            # prefer exact list column name in model header, else alias without marker
+            val = None
+            # try exact name
+            if _norm_key(col) in norm_map:
+                val = norm_map[_norm_key(col)]
+            # try alias without marker
+            elif alias and alias in norm_map:
+                val = norm_map[alias]
+            if val is not None:
+                base[col] = _normalize_list_field(val)
+            else:
+                # keep whatever base had (already normalized)
+                base[col] = _normalize_list_field(base.get(col, ""))
+        else:
+            # non-list column: try to map by normalized key (e.g., "clarifications")
+            nk = _norm_key(col)
+            if nk in norm_map and str(norm_map[nk]).strip():
+                base[col] = str(norm_map[nk]).strip()
+
+    return {k: base.get(k, "") for k in CSV_HEADER}
+
 # ==== Augment an existing keywords CSV (START) ====
 def augment_keywords_csv(
     existing_csv_path: str,
@@ -177,10 +295,13 @@ def augment_keywords_csv(
     """
     Read an existing keywords CSV (CSV-1) and ask the central brain to augment/amend it
     based on a new clarification prompt. The brain is approval-gated internally.
-    Writes a fully updated CSV (including header) to output_csv_path and returns that path.
+    Writes a fully normalized CSV (exact CSV_HEADER) to output_csv_path and returns that path.
     """
     if not os.path.exists(existing_csv_path):
         raise FileNotFoundError(existing_csv_path)
+
+    # Load the original single-row CSV-1 as base
+    original_row = read_single_row_csv(existing_csv_path) or {}
 
     with open(existing_csv_path, "r", encoding="utf-8") as f:
         existing_csv_text = f.read()
@@ -190,13 +311,13 @@ def augment_keywords_csv(
         "You will be given an existing keywords CSV and a new clarification.\n\n"
         "Your task:\n"
         "• Update/amend the CSV to reflect the clarification.\n"
-        "• Preserve the exact header and column order from the original CSV.\n"
-        "• Keep existing useful rows; add/modify/remove rows only as needed to improve precision/recall.\n"
+        "• Preserve the exact semantics of the original columns (do not invent new fields).\n"
+        "• Keep existing useful content; add/modify/remove items only as needed to improve precision/recall.\n"
         "• Remove duplicates; preserve notes if present.\n\n"
         "Output rules:\n"
-        "• Return a COMPLETE CSV including the header row.\n"
+        "• Return a CSV including a header row (OK if header formatting differs; tooling will normalize).\n"
         "• Do NOT return JSON or prose, only CSV text.\n"
-        "• Use ';' as the list separator inside the '*|;|' columns, same as the original.\n"
+        "• Using plain commas is fine; tooling will normalize list separators.\n"
     )
 
     user = (
@@ -213,25 +334,38 @@ def augment_keywords_csv(
         timeout=None,
     )
 
-    updated_csv = (resp.raw_text or "").strip()
+    # Keep the raw text as-is in cognition memory; normalize only the file we save.
+    updated_csv_raw = (resp.raw_text or "").strip()
+    # If the model fenced the CSV, try to unwrap (best-effort)
+    def _extract_csv_block(text: str) -> str:
+        if not text:
+            return text
+        t = text.strip()
+        m = re.search(r"```csv\s+(.*?)```", t, flags=re.DOTALL | re.IGNORECASE)
+        if m:
+            return m.group(1).strip()
+        m = re.search(r"```\s*(.*?)```", t, flags=re.DOTALL)
+        if m:
+            return m.group(1).strip()
+        return t
 
-    # Rudimentary validity checks
-    if not updated_csv or "," not in updated_csv or "\n" not in updated_csv:
-        raise ValueError("Model did not return a plausible CSV (missing commas/lines).")
+    updated_csv_text = _extract_csv_block(updated_csv_raw)
 
-    # Optional: very light header compatibility check (non-fatal)
-    try:
-        header_line = updated_csv.splitlines()[0].strip().lower()
-        required_bits = ["run_id", "timestamp_utc", "researcher", "prompt",
-                         "seed_terms|;|", "expanded_terms|;|", "boolean_queries|;|"]
-        if not all(bit in header_line for bit in required_bits):
-            # Keep writing but you may enforce stricter checks here
-            pass
-    except Exception:
-        pass
+    # Coerce to exact CSV-1 schema (header + single row), preserving original where absent
+    normalized_row = _coerce_to_csv1_schema(
+        updated_csv_text,
+        original_row=original_row,
+        researcher_fallback=(researcher or "Researcher")
+    )
 
-    with open(output_csv_path, "w", encoding="utf-8", newline="") as f:
-        f.write(updated_csv)
+    # Ensure run_id and prompt survive unless explicitly changed
+    normalized_row["run_id"] = original_row.get("run_id", normalized_row.get("run_id", make_run_id()))
+    normalized_row["prompt"] = original_row.get("prompt", normalized_row.get("prompt", ""))
+
+    # Write out a single-row CSV with our canonical header
+    out_dir = os.path.dirname(output_csv_path) or "."
+    os.makedirs(out_dir, exist_ok=True)
+    write_csv_row(output_csv_path, normalized_row, CSV_HEADER)
 
     return output_csv_path
 

@@ -297,6 +297,9 @@ class AilysGUI(QWidget):
         self.cfg_ncbi.setEchoMode(QLineEdit.Password)
         self.cfg_rate = QLineEdit()
         self.cfg_mode = QLineEdit()
+        self.cfg_provider = QLineEdit()  # "openai" | "openai_compatible"
+        self.cfg_model = QLineEdit()  # e.g., "gpt-4o", "gpt-5"
+        self.cfg_base_url = QLineEdit()  # e.g., "http://localhost:11434/v1" for local servers
 
         def add_row(label_text, widget):
             layout.addWidget(QLabel(label_text))
@@ -309,6 +312,9 @@ class AilysGUI(QWidget):
         add_row("NCBI (PubMed) API Key", self.cfg_ncbi)
         add_row("Polite throttle seconds (LIT_RATE_LIMIT_SEC)", self.cfg_rate)
         add_row("Approval mode (manual | auto | dryrun) [AILYS_APPROVAL_MODE]", self.cfg_mode)
+        add_row("LLM Provider (AILYS_PROVIDER: openai | openai_compatible)", self.cfg_provider)
+        add_row("LLM Model (AILYS_MODEL)", self.cfg_model)
+        add_row("LLM Base URL (AILYS_BASE_URL; for compatible servers)", self.cfg_base_url)
 
         # Buttons row
         btns = QHBoxLayout()
@@ -340,6 +346,9 @@ class AilysGUI(QWidget):
             self.cfg_ncbi.setText(vals.get("NCBI_API_KEY", ""))
             self.cfg_rate.setText(vals.get("LIT_RATE_LIMIT_SEC", "1.5"))
             self.cfg_mode.setText(vals.get("AILYS_APPROVAL_MODE", "manual"))
+            self.cfg_provider.setText(vals.get("AILYS_PROVIDER", "openai"))
+            self.cfg_model.setText(vals.get("AILYS_MODEL", "gpt-4o"))
+            self.cfg_base_url.setText(vals.get("AILYS_BASE_URL", ""))
 
             # Optional feedback to chat log
             try:
@@ -356,10 +365,31 @@ class AilysGUI(QWidget):
                 "NCBI_API_KEY": self.cfg_ncbi.text().strip(),
                 "LIT_RATE_LIMIT_SEC": self.cfg_rate.text().strip(),
                 "AILYS_APPROVAL_MODE": self.cfg_mode.text().strip(),
+                "AILYS_PROVIDER": self.cfg_provider.text().strip(),
+                "AILYS_MODEL": self.cfg_model.text().strip(),
+                "AILYS_BASE_URL": self.cfg_base_url.text().strip()
             }
             try:
                 from core.config import save_env_updates
                 save_env_updates(updates, self.env_path)
+                # Apply to current process so artificial_cognition reads the new values right away
+                for k, v in updates.items():
+                    if v is not None:  # empty strings are okay; they clear a value
+                        os.environ[k] = v
+
+                # If approval mode changed, apply it to the shared queue
+                try:
+                    approvals.approval_queue.set_mode(self.cfg_mode.text().strip().lower())
+                except Exception:
+                    pass
+
+                # Refresh the visible brain summary label
+                try:
+                    self.parent().chat_log.append("Updated LLM provider/model configuration.")
+                except Exception:
+                    pass
+                self.brain_label.setText(f"Brain: {ac.model_summary()}")
+
                 QMessageBox.information(
                     self,
                     "Saved",
@@ -505,14 +535,14 @@ class AilysGUI(QWidget):
 
     def run_ls_keywords(self):
         """Stage A – Prompt → Keywords (CSV-1)."""
-        self.chat_log.append("⏳ Waiting for your approval: use the Approvals pane (right side) to allow 'Generate Keywords'.")
+        self.chat_log.append(
+            "⏳ Waiting for your approval: open the Approvals pane (right) to allow 'Generate Keywords'.")
 
         prompt = self.ls_prompt.toPlainText().strip()
-        clar_csv = self.ls_clar_csv.text().strip() or None
         researcher = self.ls_researcher.text().strip() or "Researcher"
 
-        if not prompt and not clar_csv:
-            self.chat_log.append("⚠️ Provide a prompt or a clarifications CSV.")
+        if not prompt:
+            self.chat_log.append("⚠️ Please enter a search prompt for CSV-1 generation.")
             return
 
         def _task():
@@ -520,7 +550,7 @@ class AilysGUI(QWidget):
             ok, msg = run_keywords(
                 None,
                 guidance=prompt,
-                clarifications_csv_path=clar_csv,
+                clarifications_csv_path=None,  # no CSV in this stage after UI refactor
                 researcher=researcher
             )
             return ok, msg

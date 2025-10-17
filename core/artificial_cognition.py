@@ -8,6 +8,7 @@ Ailys' central "mind".
 
 from __future__ import annotations
 import json
+import traceback
 import os
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Union
@@ -96,10 +97,33 @@ class CognitionResult:
 
 # --- Persistence helpers (full-fidelity exchange logs) ----------------------
 
+def _resolve_exchanges_base() -> Path:
+    """
+    Resolve the base folder for cognition exchange logs.
+    Priority:
+      1) AILYS_EXCHANGES_DIR env var (absolute or relative to CWD)
+      2) <repo_root>/memory/exchanges  (repo_root = two levels above this file)
+    """
+    env_dir = os.getenv("AILYS_EXCHANGES_DIR", "").strip()
+    if env_dir:
+        base = Path(env_dir).expanduser()
+        if not base.is_absolute():
+            base = Path.cwd() / base
+        return base
+
+    # default: <repo_root>/memory/exchanges
+    # this file: core/artificial_cognition.py  → repo_root = parent.parent
+    repo_root = Path(__file__).resolve().parent.parent
+    return repo_root / "memory" / "exchanges"
+
 def _exchanges_dir() -> Path:
-    """Directory where full exchange JSON records are persisted."""
-    p = Path("memory") / "exchanges"
-    p.mkdir(parents=True, exist_ok=True)
+    p = _resolve_exchanges_base()
+    try:
+        p.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        print(f"[cognition:PERSIST] ERROR creating exchanges dir {p}: {e}")
+        print(traceback.format_exc())
+    print(f"[cognition:PERSIST] exchanges_dir = {p}  (cwd={Path.cwd()})")
     return p
 
 def _persist_exchange(record: Dict[str, Any]) -> str:
@@ -109,9 +133,15 @@ def _persist_exchange(record: Dict[str, Any]) -> str:
     ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
     sid = uuid.uuid4().hex[:8]
     path = _exchanges_dir() / f"{ts}_{sid}.json"
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(record, f, ensure_ascii=False, indent=2)
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(record, f, ensure_ascii=False, indent=2)
+        print(f"[cognition:PERSIST] wrote exchange JSON → {path}")
+    except Exception as e:
+        print(f"[cognition:PERSIST] ERROR writing {path}: {e}")
+        print(traceback.format_exc())
     return str(path.resolve())
+
 
 # ------------------------------ Public API ---------------------------------
 
@@ -184,9 +214,47 @@ def ask(
         if mx is not None:
             chat_args["max_tokens"] = mx
 
-        # Execute
-        resp = client.chat.completions.create(**chat_args)
-        content = resp.choices[0].message.content or ""
+        # Execute (always run, even if max_tokens is None)
+        print(f"[cognition:CALL] provider={prov} model={mdl} base_url={_base_url() or ''}")
+        print(f"[cognition:CALL] cwd={Path.cwd()}  exchanges_base={_resolve_exchanges_base()}")
+        print(f"[cognition:CALL] messages={len(messages)} temp={temp} max_tokens={mx}")
+
+        def _call_with_fallbacks(args: Dict[str, Any]):
+            """
+            Try the chat completion; if provider rejects certain params (e.g., temperature or max_tokens),
+            remove them and retry once. Keeps within the same approved call.
+            """
+            try:
+                return client.chat.completions.create(**args)
+            except Exception as e:
+                msg = str(e)
+                # Temperature unsupported → drop temperature and retry once
+                if ("temperature" in msg or "'temperature'" in msg) and ("unsupported" in msg or "Unsupported" in msg):
+                    safe = dict(args)
+                    if "temperature" in safe:
+                        safe.pop("temperature", None)
+                    print("[cognition:CALL] Retrying without temperature due to provider constraints.")
+                    return client.chat.completions.create(**safe)
+                # max_tokens unsupported → drop max_tokens and retry once
+                if ("max_tokens" in msg or "'max_tokens'" in msg) and ("unsupported" in msg or "Unsupported" in msg):
+                    safe = dict(args)
+                    if "max_tokens" in safe:
+                        safe.pop("max_tokens", None)
+                    print("[cognition:CALL] Retrying without max_tokens due to provider constraints.")
+                    return client.chat.completions.create(**safe)
+                # bubble up original error if not a known constraint
+                raise
+
+        resp = _call_with_fallbacks(chat_args)
+
+        # Extract raw content and usage
+        try:
+            content = resp.choices[0].message.content
+        except Exception as e:
+            print("[cognition:CALL] ERROR extracting content from response:", e)
+            print(traceback.format_exc())
+            content = ""
+
         usage = {}
         try:
             usage = {
@@ -197,62 +265,56 @@ def ask(
         except Exception:
             usage = None
 
-            # Persist exchange (best-effort full object + raw text)
-            # Try to capture a serializable version of the response object.
+        # Best-effort serialization of full SDK response
+        try:
+            resp_dump = resp.model_dump()  # OpenAI SDK v1
+        except Exception:
             try:
-                # OpenAI SDK v1 objects usually support model_dump()
-                resp_dump = resp.model_dump()  # type: ignore[attr-defined]
+                resp_dump = resp.to_dict()  # some compatible SDKs
             except Exception:
-                try:
-                    # Some SDKs expose .to_dict()
-                    resp_dump = resp.to_dict()  # type: ignore[attr-defined]
-                except Exception:
-                    # Fallback string—still useful as a forensic breadcrumb
-                    resp_dump = str(resp)
+                resp_dump = str(resp)
 
-            exchange_record: Dict[str, Any] = {
-                "timestamp_utc": datetime.utcnow().isoformat(),
-                "description": description,  # captured from outer scope
-                "provider": prov,
-                "model": mdl,
-                "base_url": _base_url(),
-                "parameters": {"temperature": temp, "max_tokens": mx},
-                "messages": messages,  # exact input we sent
-                "response": resp_dump,  # best-effort full object
-                "raw_text": content,  # exact content as returned
-                "usage": usage,
-            }
-            exchange_path = _persist_exchange(exchange_record)
+        # Persist full exchange
+        exchange_record: Dict[str, Any] = {
+            "timestamp_utc": datetime.utcnow().isoformat(),
+            "description": description,
+            "provider": prov,
+            "model": mdl,
+            "base_url": _base_url(),
+            "parameters": {"temperature": temp, "max_tokens": mx},
+            "messages": messages,
+            "response": resp_dump,
+            "raw_text": content,
+            "usage": usage,
+        }
+        exchange_path = _persist_exchange(exchange_record)
 
-            # Also drop a crystallized breadcrumb for later recall/analytics
-            try:
-                # Keep this tiny; no extra cognition here.
-                snippet = (content if isinstance(content, str) else str(content))[:3000]
-                save_memory_event(
-                    event_type="cognition_exchange",
-                    source_text=snippet,
-                    ai_insight=f"Exchange stored at {exchange_path}.",
-                    user_input=description,
-                    tags=[f"provider:{prov}", f"model:{mdl}", "cognition", "llm"],
-                    file_path=exchange_path,
-                )
-            except Exception:
-                # Never block the main flow on memory I/O
-                pass
-
-            # Return raw text (no strip/trim) to avoid any downstream surprises
-            return CognitionResult(
-                model_id=mdl,
-                raw_text=content if isinstance(content, str) else str(content),
-                usage=usage,
-                provider=prov
+        # Crystallized memory breadcrumb (non-blocking)
+        try:
+            snippet = (content if isinstance(content, str) else str(content))[:3000]
+            save_memory_event(
+                event_type="cognition_exchange",
+                source_text=snippet,
+                ai_insight=f"Exchange stored at {exchange_path}.",
+                user_input=description,
+                tags=[f"provider:{prov}", f"model:{mdl}", "cognition", "llm"],
+                file_path=exchange_path,
             )
+            print(f"[cognition:MEMORY] breadcrumb recorded for {exchange_path}")
+        except Exception as e:
+            print(f"[cognition:MEMORY] ERROR saving breadcrumb for {exchange_path}: {e}")
+            print(traceback.format_exc())
 
+        # Return raw text as a string (no normalization)
+        try:
+            raw_out = content if isinstance(content, str) else str(content)
+        except Exception:
+            raw_out = "" if content is None else str(content)
 
-        # Return raw text (no strip/trim) to avoid any downstream surprises
+        print(f"[cognition:RETURN] len(raw_text)={len(raw_out)} usage={usage}")
         return CognitionResult(
             model_id=mdl,
-            raw_text=content if isinstance(content, str) else str(content),
+            raw_text=raw_out,
             usage=usage,
             provider=prov
         )
