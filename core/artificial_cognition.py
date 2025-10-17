@@ -11,7 +11,7 @@ import json
 import traceback
 import os
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 # persistence & memory
 from pathlib import Path
@@ -59,11 +59,17 @@ def _cfg(key: str, default: Optional[str] = None) -> Optional[str]:
         return str(file_cfg[key])
     return default
 
+def _llm_timeout() -> float:
+    try:
+        return float(_cfg("AILYS_LLM_TIMEOUT", "60"))
+    except Exception:
+        return 60.0
+
 def _provider() -> str:
     return (_cfg("AILYS_PROVIDER", "openai") or "openai").strip().lower()
 
 def _model() -> str:
-    return (_cfg("AILYS_MODEL", "gpt-4o") or "gpt-4o").strip()
+    return (_cfg("AILYS_MODEL", "gpt-5") or "gpt-5").strip()
 
 def _base_url() -> Optional[str]:
     val = _cfg("AILYS_BASE_URL", None)
@@ -80,11 +86,13 @@ def _default_temperature() -> float:
         return 0.3
 
 def _default_max_tokens() -> Optional[int]:
-    v = _cfg("AILYS_DEFAULT_MAX_TOKENS", "")
+    # Default to 2000 if user hasn't set anything.
+    v = _cfg("AILYS_DEFAULT_MAX_TOKENS", "2000")
     try:
-        return int(v) if str(v).strip() else None
+        return int(v) if str(v).strip() else 2000
     except Exception:
-        return None
+        return 2000
+
 
 # ------------------------------ Result object ------------------------------
 
@@ -125,6 +133,31 @@ def _exchanges_dir() -> Path:
         print(traceback.format_exc())
     print(f"[cognition:PERSIST] exchanges_dir = {p}  (cwd={Path.cwd()})")
     return p
+
+def _persist_snapshot(call_id: str, suffix: str, payload: Dict[str, Any]) -> str:
+    """
+    Write a small JSON snapshot for a stage in the lifecycle (queued, preflight, denied, etc.).
+    File name: <utc>_<callid>_<suffix>.json
+    Always best-effort; never throws.
+    """
+    try:
+        base = _exchanges_dir()
+        ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+        path = base / f"{ts}_{call_id}_{suffix}.json"
+        base.mkdir(parents=True, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+            try:
+                f.flush()
+                os.fsync(f.fileno())
+            except Exception:
+                pass
+        print(f"[cognition:PERSIST] snapshot '{suffix}' → {path}")
+        return str(path.resolve())
+    except Exception as e:
+        print(f"[cognition:PERSIST] snapshot ERROR ({suffix}): {e}")
+        return ""
+
 
 def _persist_exchange(record: Dict[str, Any]) -> str:
     """
@@ -175,6 +208,20 @@ def ask(
     temp = _default_temperature() if temperature is None else float(temperature)
     mx = _default_max_tokens() if max_tokens is None else int(max_tokens)
 
+    call_id = uuid.uuid4().hex[:8]
+
+    # Stage 1: awaiting approval snapshot
+    _persist_snapshot(call_id, "queued", {
+        "timestamp_utc": datetime.utcnow().isoformat(),
+        "description": description,
+        "provider": prov,
+        "model": mdl,
+        "base_url": _base_url(),
+        "parameters": {"temperature": temperature, "max_tokens": max_tokens},
+        "messages_count": len(messages or []),
+        "status": "awaiting_approval",
+    })
+
     def _do_call() -> CognitionResult:
         # We only import and read keys *inside* the call to respect approval gating.
         # Provider: OpenAI (official) or OpenAI-compatible (local server).
@@ -201,8 +248,10 @@ def ask(
 
         # Optional client-level timeout for safety
         if "timeout" not in kwargs:
-            kwargs["timeout"] = 60
+            kwargs["timeout"] = _llm_timeout()
 
+        # Disable SDK-level automatic retries: one approval = one HTTP call.
+        kwargs["max_retries"] = 0
         client = OpenAI(**kwargs)
 
         # Build chat args
@@ -214,110 +263,131 @@ def ask(
         if mx is not None:
             chat_args["max_tokens"] = mx
 
+        # Some providers/models (e.g., "gpt-5") reject non-default temperature.
+        if prov == "openai" and mdl.lower().startswith("gpt-5") and "temperature" in chat_args:
+            if temp is not None and float(temp) != 1.0:
+                print("[cognition:CALL] dropping temperature for gpt-5 compatibility")
+                chat_args.pop("temperature", None)
+
+
         # Execute (always run, even if max_tokens is None)
         print(f"[cognition:CALL] provider={prov} model={mdl} base_url={_base_url() or ''}")
         print(f"[cognition:CALL] cwd={Path.cwd()}  exchanges_base={_resolve_exchanges_base()}")
         print(f"[cognition:CALL] messages={len(messages)} temp={temp} max_tokens={mx}")
 
-        def _call_with_fallbacks(args: Dict[str, Any]):
-            """
-            Try the chat completion; if provider rejects certain params (e.g., temperature or max_tokens),
-            remove them and retry once. Keeps within the same approved call.
-            """
-            try:
-                return client.chat.completions.create(**args)
-            except Exception as e:
-                msg = str(e)
-                # Temperature unsupported → drop temperature and retry once
-                if ("temperature" in msg or "'temperature'" in msg) and ("unsupported" in msg or "Unsupported" in msg):
-                    safe = dict(args)
-                    if "temperature" in safe:
-                        safe.pop("temperature", None)
-                    print("[cognition:CALL] Retrying without temperature due to provider constraints.")
-                    return client.chat.completions.create(**safe)
-                # max_tokens unsupported → drop max_tokens and retry once
-                if ("max_tokens" in msg or "'max_tokens'" in msg) and ("unsupported" in msg or "Unsupported" in msg):
-                    safe = dict(args)
-                    if "max_tokens" in safe:
-                        safe.pop("max_tokens", None)
-                    print("[cognition:CALL] Retrying without max_tokens due to provider constraints.")
-                    return client.chat.completions.create(**safe)
-                # bubble up original error if not a known constraint
-                raise
+        print(f"[cognition:CALL] id={call_id} provider={prov} model={mdl} base_url={_base_url() or ''}")
+        print(f"[cognition:CALL] id={call_id} cwd={Path.cwd()}  exchanges_base={_resolve_exchanges_base()}")
+        print(
+            f"[cognition:CALL] id={call_id} messages={len(messages)} temp={chat_args.get('temperature', '∅')} max_tokens={chat_args.get('max_tokens', '∅')}")
 
-        resp = _call_with_fallbacks(chat_args)
 
-        # Extract raw content and usage
+        # request-level timeout (seconds) – independent of client connect timeout
+
         try:
-            content = resp.choices[0].message.content
-        except Exception as e:
-            print("[cognition:CALL] ERROR extracting content from response:", e)
-            print(traceback.format_exc())
+            _persist_snapshot(call_id, "preflight", {
+                "timestamp_utc": datetime.utcnow().isoformat(),
+                "description": description,
+                "provider": prov,
+                "model": mdl,
+                "parameters": {"temperature": chat_args.get("temperature", None),
+                               "max_tokens": chat_args.get("max_tokens", None)},
+                "messages_count": len(messages),
+                "status": "about_to_call"
+            })
+
+            resp = client.chat.completions.create(**chat_args)
+            # ---------- success path ----------
             content = ""
-
-        usage = {}
-        try:
-            usage = {
-                "prompt_tokens": getattr(resp.usage, "prompt_tokens", None),
-                "completion_tokens": getattr(resp.usage, "completion_tokens", None),
-                "total_tokens": getattr(resp.usage, "total_tokens", None),
-            }
-        except Exception:
-            usage = None
-
-        # Best-effort serialization of full SDK response
-        try:
-            resp_dump = resp.model_dump()  # OpenAI SDK v1
-        except Exception:
             try:
-                resp_dump = resp.to_dict()  # some compatible SDKs
+                content = resp.choices[0].message.content or ""
             except Exception:
-                resp_dump = str(resp)
+                content = ""
 
-        # Persist full exchange
-        exchange_record: Dict[str, Any] = {
-            "timestamp_utc": datetime.utcnow().isoformat(),
-            "description": description,
-            "provider": prov,
-            "model": mdl,
-            "base_url": _base_url(),
-            "parameters": {"temperature": temp, "max_tokens": mx},
-            "messages": messages,
-            "response": resp_dump,
-            "raw_text": content,
-            "usage": usage,
-        }
-        exchange_path = _persist_exchange(exchange_record)
+            try:
+                usage = {
+                    "prompt_tokens": getattr(resp.usage, "prompt_tokens", None),
+                    "completion_tokens": getattr(resp.usage, "completion_tokens", None),
+                    "total_tokens": getattr(resp.usage, "total_tokens", None),
+                }
+            except Exception:
+                usage = None
 
-        # Crystallized memory breadcrumb (non-blocking)
-        try:
-            snippet = (content if isinstance(content, str) else str(content))[:3000]
-            save_memory_event(
-                event_type="cognition_exchange",
-                source_text=snippet,
-                ai_insight=f"Exchange stored at {exchange_path}.",
-                user_input=description,
-                tags=[f"provider:{prov}", f"model:{mdl}", "cognition", "llm"],
-                file_path=exchange_path,
-            )
-            print(f"[cognition:MEMORY] breadcrumb recorded for {exchange_path}")
-        except Exception as e:
-            print(f"[cognition:MEMORY] ERROR saving breadcrumb for {exchange_path}: {e}")
-            print(traceback.format_exc())
+            try:
+                resp_dump = resp.model_dump()
+            except Exception:
+                try:
+                    resp_dump = resp.to_dict()
+                except Exception:
+                    resp_dump = str(resp)
 
-        # Return raw text as a string (no normalization)
-        try:
+            # Truncate massive payloads to avoid crashes
+            _dump_str = None
+            try:
+                _dump_str = json.dumps(resp_dump)
+            except Exception:
+                _dump_str = str(resp_dump)
+            if _dump_str and len(_dump_str) > 2_000_000:
+                resp_dump = {"truncated": True, "note": "response too large to store safely"}
+
+            exchange_record = {
+                "call_id": call_id,
+                "timestamp_utc": datetime.utcnow().isoformat(),
+                "description": description,
+                "provider": prov,
+                "model": mdl,
+                "base_url": _base_url(),
+                "parameters": {"temperature": temp, "max_tokens": mx},
+                "messages": messages,
+                "response": resp_dump,
+                "raw_text": content,
+                "usage": usage,
+                "error": None,
+            }
+            exchange_path = _persist_exchange(exchange_record)
+
+            try:
+                snippet = (content if isinstance(content, str) else str(content))[:3000]
+                save_memory_event(
+                    event_type="cognition_exchange",
+                    source_text=snippet,
+                    ai_insight=f"Exchange stored at {exchange_path}.",
+                    user_input=description,
+                    tags=[f"provider:{prov}", f"model:{mdl}", "cognition", "llm"],
+                    file_path=exchange_path,
+                )
+            except Exception:
+                pass
+
             raw_out = content if isinstance(content, str) else str(content)
-        except Exception:
-            raw_out = "" if content is None else str(content)
+            print(f"[cognition:RETURN] id={call_id} len(raw_text)={len(raw_out)} usage={usage}")
+            return CognitionResult(model_id=mdl, raw_text=raw_out, usage=usage, provider=prov)
 
-        print(f"[cognition:RETURN] len(raw_text)={len(raw_out)} usage={usage}")
-        return CognitionResult(
-            model_id=mdl,
-            raw_text=raw_out,
-            usage=usage,
-            provider=prov
-        )
+        except Exception as e:
+            # ---------- error path: ALWAYS persist a forensic record ----------
+            err_info = {"type": type(e).__name__, "message": str(e)}
+            try:
+                import traceback as _tb
+                err_info["traceback"] = _tb.format_exc()
+            except Exception:
+                pass
+
+            exchange_record = {
+                "call_id": call_id,
+                "timestamp_utc": datetime.utcnow().isoformat(),
+                "description": description,
+                "provider": prov,
+                "model": mdl,
+                "base_url": _base_url(),
+                "parameters": {"temperature": temp, "max_tokens": mx},
+                "messages": messages,
+                "response": None,
+                "raw_text": "",
+                "usage": None,
+                "error": err_info,
+            }
+            exchange_path = _persist_exchange(exchange_record)
+            print(f"[cognition:ERROR] id={call_id} persisted forensic record → {exchange_path}")
+            raise
 
     # Approval gate: only now will the call happen
     result = approvals.request_approval(
@@ -326,7 +396,13 @@ def ask(
         timeout=timeout
     )
     if not result:
-        # Either denied, dryrun, or failure inside approval worker
+        _persist_snapshot(call_id, "denied_or_failed", {
+            "timestamp_utc": datetime.utcnow().isoformat(),
+            "description": description,
+            "provider": prov,
+            "model": mdl,
+            "status": "approval_denied_or_no_result"
+        })
         raise RuntimeError("Approval declined or failed; no result returned.")
 
     if not isinstance(result, CognitionResult):

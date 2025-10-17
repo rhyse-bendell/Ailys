@@ -138,10 +138,12 @@ def run(
     # Call LLM via central brain (approval-gated internally).
     print("Awaiting approval: 'Generate Keywords' request is queued in the Approvals pane.", flush=True)
     resp = brain.ask(
-        messages=_build_messages(prompt=prompt, clarifications=clarifications),
-        description="Literature Search: generate keywords and boolean queries",
-        temperature=0.2,
-        timeout=None,  # wait until you approve in the pane
+        messages=[{"role": "system", "content": system},
+                  {"role": "user", "content": user}],
+        description="Literature Search: augment existing keywords CSV",
+        temperature=None,
+        max_tokens=800,  # enough for a one-row CSV with lists
+        timeout=None,
     )
     llm_reply = resp.raw_text
     if not llm_reply:
@@ -330,7 +332,8 @@ def augment_keywords_csv(
         messages=[{"role": "system", "content": system},
                   {"role": "user", "content": user}],
         description="Literature Search: augment existing keywords CSV",
-        temperature=0.2,
+        temperature=None,
+        max_tokens=2000,  # plenty for a one-row CSV with lists
         timeout=None,
     )
 

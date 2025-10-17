@@ -1,6 +1,7 @@
 import sys
 import os
 from typing import Optional
+from PySide6.QtGui import QCursor
 
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QPushButton, QFileDialog,
@@ -107,6 +108,12 @@ class AilysGUI(QWidget):
         self.brain_label.setStyleSheet("color: #666;")
         right_layout.addWidget(self.brain_label, 0, Qt.AlignTop)
 
+        # ---- Global busy indicator (non-blocking) ----
+        self.global_busy = QProgressBar()
+        self.global_busy.setRange(0, 0)           # marquee
+        self.global_busy.setVisible(False)
+        right_layout.addWidget(self.global_busy)
+
         # List of pending approvals
         self.approvals_list = QListWidget()
         right_layout.addWidget(self.approvals_list, 1)
@@ -152,9 +159,40 @@ class AilysGUI(QWidget):
 
         self.approval_timer = QTimer()
         self.approval_timer.timeout.connect(self.check_approval_notifications)
-        self.approval_timer.start(5000)  # every 5 seconds
+        self.approval_timer.start(1000)  # every 5 seconds
         QTimer.singleShot(200, self.check_approval_notifications)  # kick a first poll
         self.refresh_approvals_pane()
+
+    # ---------- Global busy guard ----------
+    def _busy_start(self, msg: str = "Working..."):
+        try:
+            self.global_busy.setFormat(msg)
+            self.global_busy.setVisible(True)
+        except Exception:
+            pass
+        try:
+            QApplication.setOverrideCursor(Qt.WaitCursor)
+        except Exception:
+            pass
+        # optionally disable main tabs to avoid accidental clicks
+        try:
+            self.tabs.setEnabled(False)
+        except Exception:
+            pass
+
+    def _busy_stop(self):
+        try:
+            self.global_busy.setVisible(False)
+        except Exception:
+            pass
+        try:
+            QApplication.restoreOverrideCursor()
+        except Exception:
+            pass
+        try:
+            self.tabs.setEnabled(True)
+        except Exception:
+            pass
 
     # ----------------- Common helpers -----------------
 
