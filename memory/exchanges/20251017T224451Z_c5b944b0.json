@@ -1,0 +1,70 @@
+{
+  "call_id": "d2eededa",
+  "attempt": 1,
+  "timestamp_utc": "2025-10-17T22:44:51.350474",
+  "description": "Literature Search: generate keywords and boolean queries",
+  "provider": "openai",
+  "model": "gpt-5",
+  "base_url": null,
+  "parameters": {
+    "temperature": null,
+    "max_tokens": null,
+    "max_completion_tokens": 2000
+  },
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are Ailys, a research assistant focused on turning free-text literature needs into actionable search artifacts for academic engines (OpenAlex, Crossref, arXiv, PubMed, Semantic Scholar). Your job:\n1) Extract core 'seed terms' (compact, generalizable concepts).\n2) Expand with synonyms, near-neighbors, controlled-vocabulary terms (e.g., MeSH), acronyms, spelling variants (US/UK), hyphenation variants (e.g., co-creation vs cocreation), morphological variants (stems/wildcards like collaborat*), and cross-disciplinary labels.\n3) Produce 3–6 Boolean query variants covering three tiers:\n   • Precision (narrow, high signal)\n   • Balanced (trade-off)\n   • Recall (broader, exploratory)\n   Each query must be syntactically valid for common academic engines (quotes for phrases, AND/OR/NOT, parentheses, wildcards * when supported). Include inclusion/exclusion logic when helpful.\n\nQuality rules:\n- Be exhaustive – do not omit nuanced concepts.\n- Cover high-pressure domains explicitly where relevant: military, first responders, healthcare.\n- Prefer field-agnostic wording unless niche jargon is justified; if niche is needed, include both the niche and general term.\n- Include both conceptual and operational/measurement terms (e.g., 'shared mental models' and 'SMM', 'joint attention', 'after-action review').\n- Add common abbreviations and expansions (HAI, HRI, SMM, AAR).\n- Add negative keywords for typical confounds (e.g., education level filters if not relevant; consumer social media if off-topic).\n- Never invent references or IDs.\n- Output MUST be valid JSON exactly matching the schema below.\n\nOutput schema (JSON):\n{\n  'seed_terms': string[10..20],\n  'expanded_terms': string[20..50],\n  'boolean_queries': string[3..6],\n  'notes': string\n}\n\nIf the prompt is ambiguous, infer reasonable breadth and note assumptions in 'notes'. Return only JSON; no extra text or CSV."
+    },
+    {
+      "role": "user",
+      "content": "Research prompt (verbatim from researcher):\nI need you to conduct a literature search on collaborative learning in human-AI teams. The search needs to cover topics such as how teams search for, acquire, and happen upon information and how they operate over that information to develop shared or individual knowledge sets. Further, the search needs to include how the inclusion of AI in teams (e.g., as Centaur human-AI dyads, as team coaches or assistants, as separate team members) impacts the ways in which teams acquire information/knowledge and how they learn with a focus on ways in which AI inclusion positively and negatively impacts individual and team learning. It is important that the literature search cover high pressure domains such as military, first responders, healthcare.\n\nAdditional clarifications (optional):\n\n\nContext & guardrails:\n- Prioritize literature on collaboration/learning with or without AI – centaur dyads, AI teammates, coaches, assistants – and effects on information seeking, knowledge-building, and team learning.\n- Ensure domain coverage for high-pressure settings (military, first responders, healthcare).\n- Include mechanisms (e.g., sensemaking, shared mental models, joint attention), processes (e.g., AARs, debriefs, knowledge sharing), and outcomes (e.g., learning, adaptation).\n- Add US/UK spelling variants, hyphenation variants, stems/wildcards, and acronyms.\n\nReturn only a JSON object matching the schema from the system message. Do not include any prose before or after. Label Boolean tiers inline, e.g.:\n[Precision] (\"shared mental models\" AND team* AND (human-AI OR centaur) ...)\n"
+    }
+  ],
+  "response": {
+    "id": "chatcmpl-CRnTNlSpPPLMBUbiQg5lPmZB7CSrx",
+    "choices": [
+      {
+        "finish_reason": "length",
+        "index": 0,
+        "logprobs": null,
+        "message": {
+          "content": "",
+          "refusal": null,
+          "role": "assistant",
+          "annotations": [],
+          "audio": null,
+          "function_call": null,
+          "tool_calls": null
+        }
+      }
+    ],
+    "created": 1760741065,
+    "model": "gpt-5-2025-08-07",
+    "object": "chat.completion",
+    "service_tier": "default",
+    "system_fingerprint": null,
+    "usage": {
+      "completion_tokens": 2000,
+      "prompt_tokens": 770,
+      "total_tokens": 2770,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 2000,
+        "rejected_prediction_tokens": 0
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cached_tokens": 0
+      }
+    }
+  },
+  "raw_text": "",
+  "usage": {
+    "prompt_tokens": 770,
+    "completion_tokens": 2000,
+    "total_tokens": 2770
+  },
+  "error": null
+}

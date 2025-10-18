@@ -59,6 +59,26 @@ def _cfg(key: str, default: Optional[str] = None) -> Optional[str]:
         return str(file_cfg[key])
     return default
 
+# --- Model profiles & helpers -------------------------------------------------
+
+def _token_param_for(prov: str, model: str) -> str:
+    """
+    Return the correct token-limit parameter name for this model/provider.
+    """
+    m = (model or "").lower().strip()
+    if prov == "openai" and m.startswith("gpt-5"):
+        return "max_completion_tokens"
+    return "max_tokens"  # 4o/4.x and most openai_compatible servers
+
+def _should_drop_temperature(prov: str, model: str, temperature: Optional[float]) -> bool:
+    """
+    Some models (e.g., OpenAI gpt-5) ignore or reject custom temperature.
+    """
+    if prov == "openai" and model.lower().startswith("gpt-5"):
+        return True
+    return False
+
+
 def _llm_timeout() -> float:
     try:
         return float(_cfg("AILYS_LLM_TIMEOUT", "60"))
@@ -175,6 +195,12 @@ def _persist_exchange(record: Dict[str, Any]) -> str:
         print(traceback.format_exc())
     return str(path.resolve())
 
+def _with_arg(args: Dict[str, Any], key: str, value: Any, *, remove: Optional[List[str]] = None) -> Dict[str, Any]:
+    out = dict(args)
+    out[key] = value
+    for k in (remove or []):
+        out.pop(k, None)
+    return out
 
 # ------------------------------ Public API ---------------------------------
 
@@ -231,82 +257,88 @@ def ask(
         "status": "awaiting_approval",
     })
 
-    def _do_call() -> CognitionResult:
+    def _do_call(overrides: Optional[Dict[str, Any]] = None) -> CognitionResult:
         # We only import and read keys *inside* the call to respect approval gating.
-        # Provider: OpenAI (official) or OpenAI-compatible (local server).
         try:
             from openai import OpenAI
         except Exception as e:
-            # Keep the behavior consistent: surface as RuntimeError to caller thread
             raise RuntimeError(f"OpenAI SDK not available: {e}")
 
-        # Build client safely
+        # --- Apply approval-time overrides (model, token cap, timeout) -------------
+        eff_model = (overrides or {}).get("model", mdl)
+        eff_timeout = (overrides or {}).get("timeout", None)
+        ov_max_tokens = (overrides or {}).get("max_tokens", None)
+        ov_max_completion_tokens = (overrides or {}).get("max_completion_tokens", None)
+        eff_mx = ov_max_tokens if ov_max_tokens is not None else (
+            ov_max_completion_tokens if ov_max_completion_tokens is not None else mx)
+
+        # Build client
         kwargs = {}
         if prov == "openai_compatible":
-            # Local servers often require base_url; some don't need an API key.
             if base_url:
                 kwargs["base_url"] = base_url
-            # Pass key if present; some local servers accept empty/no key.
             if api_key:
                 kwargs["api_key"] = api_key
         else:
-            # Hosted OpenAI requires API key
             if not api_key:
                 raise RuntimeError("OPENAI_API_KEY is not set. Add it in the Config tab.")
             kwargs["api_key"] = api_key
 
-        # Optional client-level timeout for safety
         if "timeout" not in kwargs:
-            kwargs["timeout"] = _llm_timeout()
+            kwargs["timeout"] = eff_timeout if isinstance(eff_timeout, (int, float)) else _llm_timeout()
 
-        # Disable SDK-level automatic retries: one approval = one HTTP call.
+        # Disable SDK-level retries: approval = one HTTP call
         kwargs["max_retries"] = 0
         client = OpenAI(**kwargs)
 
-        # Build chat args
+        # Build chat args using the (possibly overridden) model
         chat_args: Dict[str, Any] = {
-            "model": mdl,
+            "model": eff_model,
             "messages": messages,
-            "temperature": temp,
         }
-        if mx is not None:
-            chat_args["max_tokens"] = mx
 
-        # Some providers/models (e.g., "gpt-5") reject non-default temperature.
-        if prov == "openai" and mdl.lower().startswith("gpt-5") and "temperature" in chat_args:
-            if temp is not None and float(temp) != 1.0:
-                print("[cognition:CALL] dropping temperature for gpt-5 compatibility")
-                chat_args.pop("temperature", None)
+        # temperature policy
+        if not _should_drop_temperature(prov, eff_model, temp):
+            chat_args["temperature"] = temp
+        else:
+            print("[cognition:CALL] dropping temperature per model profile")
 
+        # token-limit field per model (re-evaluated for eff_model)
+        token_param = _token_param_for(prov, eff_model)
+        if eff_mx is not None:
+            chat_args[token_param] = eff_mx
+        if token_param == "max_completion_tokens":
+            chat_args.pop("max_tokens", None)
+        else:
+            chat_args.pop("max_completion_tokens", None)
 
-        # Execute (always run, even if max_tokens is None)
-        print(f"[cognition:CALL] provider={prov} model={mdl} base_url={_base_url() or ''}")
+        # Diagnostics
+        print(f"[cognition:CALL] provider={prov} model={eff_model} base_url={_base_url() or ''}")
         print(f"[cognition:CALL] cwd={Path.cwd()}  exchanges_base={_resolve_exchanges_base()}")
-        print(f"[cognition:CALL] messages={len(messages)} temp={temp} max_tokens={mx}")
+        print(f"[cognition:CALL] id={call_id} messages={len(messages)} "
+              f"temp={chat_args.get('temperature', '∅')} "
+              f"max_tokens={chat_args.get('max_tokens', '∅')} "
+              f"max_completion_tokens={chat_args.get('max_completion_tokens', '∅')}")
 
-        print(f"[cognition:CALL] id={call_id} provider={prov} model={mdl} base_url={_base_url() or ''}")
-        print(f"[cognition:CALL] id={call_id} cwd={Path.cwd()}  exchanges_base={_resolve_exchanges_base()}")
-        print(
-            f"[cognition:CALL] id={call_id} messages={len(messages)} temp={chat_args.get('temperature', '∅')} max_tokens={chat_args.get('max_tokens', '∅')}")
-
-
-        # request-level timeout (seconds) – independent of client connect timeout
-
-        try:
-            _persist_snapshot(call_id, "preflight", {
+        # ---- Helpers for per-attempt logging and execution -----------------------
+        def _single_call(attempt_idx: int, args: Dict[str, Any], attempt_tag: str) -> CognitionResult:
+            _persist_snapshot(call_id, f"{attempt_tag}_preflight", {
                 "timestamp_utc": datetime.utcnow().isoformat(),
                 "description": description,
                 "provider": prov,
-                "model": mdl,
-                "parameters": {"temperature": chat_args.get("temperature", None),
-                               "max_tokens": chat_args.get("max_tokens", None)},
+                "model": args.get("model", eff_model),
+                "parameters": {
+                    "temperature": args.get("temperature"),
+                    "max_tokens": args.get("max_tokens"),
+                    "max_completion_tokens": args.get("max_completion_tokens"),
+                },
                 "messages_count": len(messages),
                 "status": "about_to_call"
             })
 
-            resp = client.chat.completions.create(**chat_args)
-            # ---------- success path ----------
-            content = ""
+            resp = client.chat.completions.create(**args)
+
+            # Success extract
             try:
                 content = resp.choices[0].message.content or ""
             except Exception:
@@ -329,81 +361,219 @@ def ask(
                 except Exception:
                     resp_dump = str(resp)
 
-            # Truncate massive payloads to avoid crashes
-            _dump_str = None
+            # Truncate massive payloads
             try:
-                _dump_str = json.dumps(resp_dump)
+                _s = json.dumps(resp_dump)
             except Exception:
-                _dump_str = str(resp_dump)
-            if _dump_str and len(_dump_str) > 2_000_000:
+                _s = str(resp_dump)
+            if _s and len(_s) > 2_000_000:
                 resp_dump = {"truncated": True, "note": "response too large to store safely"}
 
-            exchange_record = {
+            _persist_exchange({
                 "call_id": call_id,
+                "attempt": attempt_idx,
                 "timestamp_utc": datetime.utcnow().isoformat(),
                 "description": description,
                 "provider": prov,
-                "model": mdl,
+                "model": args.get("model", eff_model),
                 "base_url": _base_url(),
-                "parameters": {"temperature": temp, "max_tokens": mx},
+                "parameters": {
+                    "temperature": args.get("temperature"),
+                    "max_tokens": args.get("max_tokens"),
+                    "max_completion_tokens": args.get("max_completion_tokens"),
+                },
                 "messages": messages,
                 "response": resp_dump,
                 "raw_text": content,
                 "usage": usage,
                 "error": None,
-            }
-            exchange_path = _persist_exchange(exchange_record)
-
-            try:
-                snippet = (content if isinstance(content, str) else str(content))[:3000]
-                save_memory_event(
-                    event_type="cognition_exchange",
-                    source_text=snippet,
-                    ai_insight=f"Exchange stored at {exchange_path}.",
-                    user_input=description,
-                    tags=[f"provider:{prov}", f"model:{mdl}", "cognition", "llm"],
-                    file_path=exchange_path,
-                )
-            except Exception:
-                pass
+            })
 
             raw_out = content if isinstance(content, str) else str(content)
-            print(f"[cognition:RETURN] id={call_id} len(raw_text)={len(raw_out)} usage={usage}")
-            return CognitionResult(model_id=mdl, raw_text=raw_out, usage=usage, provider=prov)
+            print(f"[cognition:RETURN] id={call_id} attempt={attempt_idx} len(raw_text)={len(raw_out)} usage={usage}")
+            return CognitionResult(model_id=args.get("model", eff_model), raw_text=raw_out, usage=usage, provider=prov)
 
-        except Exception as e:
-            # ---------- error path: ALWAYS persist a forensic record ----------
-            err_info = {"type": type(e).__name__, "message": str(e)}
-            try:
-                import traceback as _tb
-                err_info["traceback"] = _tb.format_exc()
-            except Exception:
-                pass
-
-            exchange_record = {
-                "call_id": call_id,
-                "timestamp_utc": datetime.utcnow().isoformat(),
-                "description": description,
-                "provider": prov,
-                "model": mdl,
-                "base_url": _base_url(),
-                "parameters": {"temperature": temp, "max_tokens": mx},
-                "messages": messages,
-                "response": None,
-                "raw_text": "",
-                "usage": None,
-                "error": err_info,
+        def _describe_fix(reason: str, fix: str, args_after: Dict[str, Any]) -> str:
+            params_preview = {
+                "temperature": args_after.get("temperature"),
+                "max_tokens": args_after.get("max_tokens"),
+                "max_completion_tokens": args_after.get("max_completion_tokens"),
             }
-            exchange_path = _persist_exchange(exchange_record)
-            print(f"[cognition:ERROR] id={call_id} persisted forensic record → {exchange_path}")
-            raise
+            return (f"Retry with adjusted parameters for {eff_model}: {fix}\n"
+                    f"Reason: {reason}\n"
+                    f"Would call with: {params_preview}")
 
-    # Approval gate: only now will the call happen
-    result = approvals.request_approval(
+        # ---- Attempt loop (initial + retries gated separately) -------------------
+        MAX_ATTEMPTS = 3
+        attempt = 1
+        args = dict(chat_args)
+
+        while attempt <= MAX_ATTEMPTS:
+            tag = "attempt1" if attempt == 1 else f"retry{attempt - 1}"
+            try:
+                if attempt == 1:
+                    # First attempt uses approval of the original request
+                    return _single_call(attempt, args, tag)
+                else:
+                    # Retry requires separate approval (already implemented above in your code)
+                    retry_desc = current_retry_desc  # set when we crafted the fix
+                    approved_result = approvals.request_approval(
+                        description=retry_desc,
+                        call_fn=lambda ov=None: _single_call(attempt, args, tag),
+                        timeout=timeout
+                    )
+                    if not approved_result:
+                        _persist_snapshot(call_id, f"{tag}_denied_or_failed", {
+                            "timestamp_utc": datetime.utcnow().isoformat(),
+                            "description": retry_desc,
+                            "provider": prov,
+                            "model": args.get("model", eff_model),
+                            "status": "approval_denied_or_no_result"
+                        })
+                        raise RuntimeError("Retry approval declined or failed; no result returned.")
+                    if not isinstance(approved_result, CognitionResult):
+                        raise RuntimeError(f"Unexpected retry result type: {type(approved_result)!r}")
+                    return approved_result
+
+            except Exception as e:
+                # Persist forensic record for this failed attempt
+                err_info = {"type": type(e).__name__, "message": str(e)}
+                try:
+                    import traceback as _tb
+                    err_info["traceback"] = _tb.format_exc()
+                except Exception:
+                    pass
+
+                _persist_exchange({
+                    "call_id": call_id,
+                    "attempt": attempt,
+                    "timestamp_utc": datetime.utcnow().isoformat(),
+                    "description": description,
+                    "provider": prov,
+                    "model": args.get("model", eff_model),
+                    "base_url": _base_url(),
+                    "parameters": {
+                        "temperature": args.get("temperature"),
+                        "max_tokens": args.get("max_tokens"),
+                        "max_completion_tokens": args.get("max_completion_tokens"),
+                    },
+                    "messages": messages,
+                    "response": None,
+                    "raw_text": "",
+                    "usage": None,
+                    "error": err_info,
+                })
+
+                if attempt >= MAX_ATTEMPTS:
+                    print(f"[cognition:ERROR] id={call_id} attempt={attempt} – no more retries.")
+                    raise
+
+                reason = str(e)
+                fix_desc = None
+                new_args = None
+
+                # Heuristics for common OpenAI errors
+                if "Unsupported parameter" in reason and "max_tokens" in reason:
+                    new_args = dict(args);
+                    new_args.pop("max_tokens", None);
+                    new_args["max_completion_tokens"] = eff_mx or mx
+                    fix_desc = "swap max_tokens → max_completion_tokens"
+                elif "Unsupported parameter" in reason and "max_completion_tokens" in reason:
+                    new_args = dict(args);
+                    new_args.pop("max_completion_tokens", None);
+                    new_args["max_tokens"] = eff_mx or mx
+                    fix_desc = "swap max_completion_tokens → max_tokens"
+
+                if (fix_desc is None) and ("temperature" in reason.lower()) and ("unsupported" in reason.lower()):
+                    if "temperature" in args:
+                        new_args = dict(args);
+                        new_args.pop("temperature", None)
+                        fix_desc = "drop temperature"
+
+                if (fix_desc is None) and any(
+                        s in reason.lower() for s in ("too many tokens", "context length", "maximum context")):
+                    if "max_completion_tokens" in args and isinstance(args["max_completion_tokens"], int):
+                        new_args = dict(args);
+                        new_args["max_completion_tokens"] = max(256, args["max_completion_tokens"] // 2)
+                        fix_desc = "halve max_completion_tokens"
+                    elif "max_tokens" in args and isinstance(args["max_tokens"], int):
+                        new_args = dict(args);
+                        new_args["max_tokens"] = max(256, args["max_tokens"] // 2)
+                        fix_desc = "halve max_tokens"
+
+                if new_args is None:
+                    print(f"[cognition:ERROR] id={call_id} attempt={attempt} – no known fix; re-raising.")
+                    raise
+
+                current_retry_desc = f"Retry {attempt}/{MAX_ATTEMPTS - 1}: " + _describe_fix(reason, fix_desc, new_args)
+                _persist_snapshot(call_id, f"{tag}_requested", {
+                    "timestamp_utc": datetime.utcnow().isoformat(),
+                    "description": current_retry_desc,
+                    "provider": prov,
+                    "model": args.get("model", eff_model),
+                    "parameters_before": {
+                        "temperature": args.get("temperature"),
+                        "max_tokens": args.get("max_tokens"),
+                        "max_completion_tokens": args.get("max_completion_tokens"),
+                    },
+                    "parameters_after": {
+                        "temperature": new_args.get("temperature"),
+                        "max_tokens": new_args.get("max_tokens"),
+                        "max_completion_tokens": new_args.get("max_completion_tokens"),
+                    },
+                    "status": "retry_requested"
+                })
+
+                args = new_args
+                attempt += 1
+
+        raise RuntimeError("Exhausted attempts without a result.")
+
+    # === Approval gate (initial call) ==========================================
+    # Try module-level helper first, then fall back to the instance on approval_queue
+    request_approval_fn = getattr(approvals, "request_approval", None)
+    if not callable(request_approval_fn):
+        request_approval_fn = getattr(approvals.approval_queue, "request_approval", None)
+
+    if not callable(request_approval_fn):
+        _persist_snapshot(call_id, "denied_or_failed", {
+            "timestamp_utc": datetime.utcnow().isoformat(),
+            "description": description,
+            "provider": prov,
+            "model": mdl,
+            "status": "no_request_approval_function"
+        })
+        raise RuntimeError("Approval system not available: request_approval function not found.")
+
+    # Record that we're enqueueing this call for approval
+    _persist_snapshot(call_id, "enqueue", {
+        "timestamp_utc": datetime.utcnow().isoformat(),
+        "description": description,
+        "provider": prov,
+        "model": mdl,
+        "status": "enqueue_request"
+    })
+    print("[cognition:APPROVAL] Enqueuing approval for cognition call...")
+
+    # Enqueue and wait for user approval (or auto/dryrun per mode)
+    result = request_approval_fn(
         description=f"{description} | provider={prov} model={mdl}",
         call_fn=_do_call,
         timeout=timeout
     )
+
+    # Record the approval return path (forensics if it returns None)
+    _persist_snapshot(call_id, "approval_returned", {
+        "timestamp_utc": datetime.utcnow().isoformat(),
+        "description": description,
+        "provider": prov,
+        "model": mdl,
+        "status": "approval_returned",
+        "result_type": (type(result).__name__ if result is not None else "None")
+    })
+    print(f"[cognition:APPROVAL] Approval returned with type="
+          f"{type(result).__name__ if result is not None else 'None'}")
+
     if not result:
         _persist_snapshot(call_id, "denied_or_failed", {
             "timestamp_utc": datetime.utcnow().isoformat(),
@@ -415,11 +585,9 @@ def ask(
         raise RuntimeError("Approval declined or failed; no result returned.")
 
     if not isinstance(result, CognitionResult):
-        # Safety: if some unexpected value seeped through
         raise RuntimeError(f"Artificial cognition returned unexpected type: {type(result)!r}")
 
     return result
-
 
 # ------------------------------ Convenience --------------------------------
 

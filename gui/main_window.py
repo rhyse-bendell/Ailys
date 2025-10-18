@@ -6,7 +6,7 @@ from PySide6.QtGui import QCursor
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QPushButton, QFileDialog,
     QTabWidget, QLabel, QHBoxLayout, QTextEdit, QComboBox, QProgressBar, QLineEdit,
-    QMessageBox, QListWidget
+    QMessageBox, QListWidget, QGroupBox
 )
 
 from PySide6.QtCore import Qt, QThread, Signal, QTimer
@@ -122,6 +122,27 @@ class AilysGUI(QWidget):
         self.approvals_info = QLabel("")
         self.approvals_info.setStyleSheet("color: #555;")
         right_layout.addWidget(self.approvals_info)
+        # ---- Optional overrides for the selected approval ----
+        overrides_box = QGroupBox("Overrides (optional)")
+        ov_layout = QVBoxLayout(overrides_box)
+
+        self.override_model = QLineEdit()
+        self.override_model.setPlaceholderText("Model (e.g., gpt-4o, gpt-5)")
+
+        self.override_max_tokens = QLineEdit()
+        self.override_max_tokens.setPlaceholderText("Max tokens (integer)")
+
+        self.override_timeout = QLineEdit()
+        self.override_timeout.setPlaceholderText("Timeout (seconds, e.g., 60)")
+
+        ov_layout.addWidget(QLabel("Model:"))
+        ov_layout.addWidget(self.override_model)
+        ov_layout.addWidget(QLabel("Max Tokens:"))
+        ov_layout.addWidget(self.override_max_tokens)
+        ov_layout.addWidget(QLabel("Timeout (seconds):"))
+        ov_layout.addWidget(self.override_timeout)
+
+        right_layout.addWidget(overrides_box)
 
         # Controls row
         btn_row = QHBoxLayout()
@@ -159,7 +180,7 @@ class AilysGUI(QWidget):
 
         self.approval_timer = QTimer()
         self.approval_timer.timeout.connect(self.check_approval_notifications)
-        self.approval_timer.start(1000)  # every 5 seconds
+        self.approval_timer.start(5000)  # every 5 seconds
         QTimer.singleShot(200, self.check_approval_notifications)  # kick a first poll
         self.refresh_approvals_pane()
 
@@ -231,12 +252,51 @@ class AilysGUI(QWidget):
             self.approvals_info.setText("Select a request to approve.")
             return
         try:
+            # Build overrides dict from the UI (only include valid entries)
+            overrides = {}
+            m = self.override_model.text().strip()
+            if m:
+                overrides["model"] = m
+            t = self.override_max_tokens.text().strip()
+            if t:
+                try:
+                    overrides["max_tokens"] = int(t)
+                except ValueError:
+                    self.chat_log.append("⚠️ Max Tokens must be an integer; ignoring override.")
+            to = self.override_timeout.text().strip()
+            if to:
+                try:
+                    overrides["timeout"] = float(to)
+                except ValueError:
+                    self.chat_log.append("⚠️ Timeout must be a number (seconds); ignoring override.")
+
+            # Build overrides dict from the UI (only include valid entries)
+            overrides = {}
+            m = self.override_model.text().strip()
+            if m:
+                overrides["model"] = m
+            t = self.override_max_tokens.text().strip()
+            if t:
+                try:
+                    overrides["max_tokens"] = int(t)
+                except ValueError:
+                    self.chat_log.append("⚠️ Max Tokens must be an integer; ignoring override.")
+            to = self.override_timeout.text().strip()
+            if to:
+                try:
+                    overrides["timeout"] = float(to)
+                except ValueError:
+                    self.chat_log.append("⚠️ Timeout must be a number (seconds); ignoring override.")
+
             # use module-level helper if present; fallback to instance
             if hasattr(approvals, "approve_request"):
-                approvals.approve_request(rid)
+                approvals.approve_request(rid, overrides or None)
             else:
-                approvals.approval_queue.approve_request(rid)
+                approvals.approval_queue.approve_request(rid, overrides or None)
+
             self.chat_log.append(f"✅ Approved request {rid}.")
+
+
         except Exception as e:
             self.chat_log.append(f"❌ Approve error: {e}")
         self.refresh_approvals_pane()
@@ -461,8 +521,9 @@ class AilysGUI(QWidget):
         """Creates the Literature Search tab with Stage A–B functionality (flow-ordered)."""
 
         from PySide6.QtWidgets import (
-            QWidget, QVBoxLayout, QLabel, QTextEdit,
-            QLineEdit, QPushButton, QFileDialog, QGroupBox, QHBoxLayout
+            QApplication, QWidget, QVBoxLayout, QPushButton, QFileDialog,
+            QTabWidget, QLabel, QHBoxLayout, QTextEdit, QComboBox, QProgressBar, QLineEdit,
+            QMessageBox, QListWidget, QGroupBox
         )
 
         tab = QWidget()

@@ -148,14 +148,17 @@ def run(
 
     # Call LLM via central brain (approval-gated internally).
     print("Awaiting approval: 'Generate Keywords' request is queued in the Approvals pane.", flush=True)
+    msgs = _build_messages(prompt=prompt, clarifications=clarifications)
+    print("DEBUG lit_search_keywords CSV-1 roles:", [m["role"] for m in msgs])
+
     resp = brain.ask(
-        messages=[{"role": "system", "content": system},
-                  {"role": "user", "content": user}],
-        description="Literature Search: augment existing keywords CSV",
-        temperature=None,
-        max_tokens=800,  # enough for a one-row CSV with lists
+        messages=msgs,
+        description="Literature Search: generate keywords and boolean queries",
+        temperature=None,  # let artificial_cognition enforce gpt-5 compatibility
+        max_tokens=2000,  # safer headroom for JSON lists
         timeout=None,
     )
+
     llm_reply = resp.raw_text
     if not llm_reply:
         raise RuntimeError("Empty model response.")

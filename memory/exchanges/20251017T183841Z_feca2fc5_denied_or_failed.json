@@ -1,0 +1,7 @@
+{
+  "timestamp_utc": "2025-10-17T18:38:41.340547",
+  "description": "Literature Search: generate keywords and boolean queries",
+  "provider": "openai",
+  "model": "gpt-5",
+  "status": "approval_denied_or_no_result"
+}

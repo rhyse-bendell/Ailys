@@ -1,0 +1,18 @@
+{
+  "timestamp_utc": "2025-10-17T22:44:51.369764",
+  "description": "Retry 1/2: Retry with adjusted parameters: switch model to gpt-4o and use max_tokens\nReason: Empty content after exhausting the completion budget (length).\nWould call with: {'model': 'gpt-4o', 'temperature': 0.3, 'max_tokens': 2000, 'max_completion_tokens': None}",
+  "provider": "openai",
+  "model": "gpt-5",
+  "parameters_before": {
+    "temperature": null,
+    "max_tokens": null,
+    "max_completion_tokens": 2000
+  },
+  "parameters_after": {
+    "model": "gpt-4o",
+    "temperature": 0.3,
+    "max_tokens": 2000,
+    "max_completion_tokens": null
+  },
+  "status": "retry_requested"
+}

@@ -18,11 +18,14 @@ def _env_mode() -> str:
 class ApprovalRequest:
     id: int
     description: str
-    call_fn: Callable[[], Any]
+    # call_fn must accept a single optional overrides dict
+    call_fn: Callable[[Optional[dict]], Any]
     approved: Optional[bool] = None
     result: Optional[object] = None
     error: Optional[BaseException] = None
+    overrides: Optional[dict] = None
     condition: threading.Condition = field(default_factory=threading.Condition)
+
 
 
 class ApprovalQueue:
@@ -114,10 +117,12 @@ class ApprovalQueue:
         print(f"[get_pending] pending={len(pend)} total={len(self._requests)} queue_id={id(self)}")
         return pend
 
-    def approve_request(self, request_id: int) -> Optional[object]:
+    def approve_request(self, request_id: int, overrides: Optional[dict] = None) -> Optional[object]:
         req = self._find_request(request_id)
         if req and req.approved is None:
             with req.condition:
+                # attach overrides and execute
+                req.overrides = overrides or None
                 result = self._execute_request(req)
                 req.condition.notify()
             return result
@@ -149,7 +154,7 @@ class ApprovalQueue:
 
     # -------- internals ------------------------------------------------------
 
-    def _enqueue(self, description: str, call_fn: Callable[[], Any]) -> ApprovalRequest:
+    def _enqueue(self, description: str, call_fn: Callable[[Optional[dict]], Any]) -> ApprovalRequest:
         with self._lock:
             request = ApprovalRequest(
                 id=self._next_id,
@@ -167,7 +172,8 @@ class ApprovalQueue:
         print(f"[execute] -> id={request.id} approved={request.approved} (before) queue_id={id(self)}")
 
         try:
-            request.result = request.call_fn()
+            # Always call the function with a single optional overrides argument
+            request.result = request.call_fn(request.overrides)
             request.approved = True
         except BaseException as e:
             request.error = e
@@ -210,9 +216,9 @@ def get_pending_requests_summary() -> List[dict]:
         })
     return items
 
-def approve_request(request_id: int) -> Optional[object]:
-    """Approve a specific pending request by id and execute it."""
-    return approval_queue.approve_request(request_id)
+def approve_request(request_id: int, overrides: Optional[dict] = None) -> Optional[object]:
+    """Approve a specific pending request by id and execute it (optionally with overrides)."""
+    return approval_queue.approve_request(request_id, overrides)
 
 def deny_request(request_id: int) -> bool:
     """Deny a specific pending request by id (does not execute the call)."""
