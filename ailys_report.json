@@ -1,94 +1,122 @@
 {
   "meta": {
-    "root": "D:\\Post-doc Work\\Ailys",
-    "timestamp": "2025-09-24 17:58:03",
+    "root": "C:\\Post-doc Work\\Ailys",
+    "timestamp": "2025-10-20 11:00:13",
     "tool": "ailys_snapshot.py",
     "version": "1.1.0"
   },
   "environment": {
-    "python_executable": "D:\\Post-doc Work\\Ailys\\venv\\Scripts\\python.exe",
-    "python_version": "3.11.3 (tags/v3.11.3:f3909b8, Apr  4 2023, 23:49:59) [MSC v.1934 64 bit (AMD64)]",
+    "python_executable": "C:\\Post-doc Work\\Ailys\\venv\\Scripts\\python.exe",
+    "python_version": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]",
     "platform": "win32",
-    "prefix": "D:\\Post-doc Work\\Ailys\\venv",
-    "base_prefix": "C:\\Users\\rhybe\\AppData\\Local\\Programs\\Python\\Python311",
-    "virtual_env_var": "C:\\Post Doc Work\\modular_assistant\\venv",
+    "prefix": "C:\\Post-doc Work\\Ailys\\venv",
+    "base_prefix": "C:\\Program Files\\Python311",
+    "virtual_env_var": "C:\\Post-doc Work\\Ailys\\venv",
     "conda_prefix": ""
   },
   "pip_freeze": [
     "annotated-types==0.7.0",
-    "anyio==4.9.0",
-    "certifi==2025.4.26",
+    "anyio==4.11.0",
+    "certifi==2025.10.5",
     "colorama==0.4.6",
     "contourpy==1.3.3",
     "cycler==0.12.1",
     "distro==1.9.0",
     "et_xmlfile==2.0.0",
-    "fonttools==4.59.2",
+    "fonttools==4.60.1",
     "h11==0.16.0",
     "httpcore==1.0.9",
     "httpx==0.28.1",
     "idna==3.10",
-    "jiter==0.9.0",
+    "jiter==0.11.0",
     "kiwisolver==1.4.9",
-    "matplotlib==3.10.6",
-    "narwhals==2.5.0",
-    "numpy==2.2.5",
-    "openai==1.78.0",
+    "matplotlib==3.10.7",
+    "numpy==2.3.3",
+    "openai==2.3.0",
     "openpyxl==3.1.5",
     "packaging==25.0",
-    "pandas==2.2.3",
-    "pillow==11.2.1",
-    "plotly==6.3.0",
-    "pydantic==2.11.4",
-    "pydantic_core==2.33.2",
-    "PyMuPDF==1.25.5",
-    "pyparsing==3.2.4",
-    "PySide6==6.9.0",
-    "PySide6_Addons==6.9.0",
-    "PySide6_Essentials==6.9.0",
+    "pandas==2.3.3",
+    "pillow==11.3.0",
+    "pillow_heif==1.1.1",
+    "pydantic==2.12.0",
+    "pydantic_core==2.41.1",
+    "PyMuPDF==1.26.5",
+    "pyparsing==3.2.5",
+    "PySide6==6.10.0",
+    "PySide6_Addons==6.10.0",
+    "PySide6_Essentials==6.10.0",
     "pytesseract==0.3.13",
     "python-dateutil==2.9.0.post0",
-    "python-dotenv==1.1.0",
+    "python-dotenv==1.1.1",
     "pytz==2025.2",
-    "shiboken6==6.9.0",
+    "shiboken6==6.10.0",
     "six==1.17.0",
     "sniffio==1.3.1",
     "tqdm==4.67.1",
-    "typing-inspection==0.4.0",
-    "typing_extensions==4.13.2",
+    "typing-inspection==0.4.2",
+    "typing_extensions==4.15.0",
     "tzdata==2025.2"
   ],
   "tree": [
     {
-      "dir": "D:\\Post-doc Work\\Ailys",
+      "dir": "C:\\Post-doc Work\\Ailys",
       "dirs": [
+        ".git",
+        ".github",
         ".idea",
         "__pycache__",
+        "ai_context",
         "core",
         "data",
+        "dist",
         "gui",
         "memory",
         "outputs",
         "reference_docs",
+        "scripts",
         "tasks",
         "venv"
       ],
       "files": [
+        {
+          "name": ".env",
+          "size_bytes": 673
+        },
+        {
+          "name": ".gitattributes",
+          "size_bytes": 123
+        },
+        {
+          "name": ".gitignore",
+          "size_bytes": 357
+        },
         {
           "name": "__init__.py",
           "size_bytes": 0
         },
         {
           "name": "ailys_snapshot.py",
-          "size_bytes": 18353
+          "size_bytes": 18356
         },
         {
-          "name": "env",
-          "size_bytes": 45
+          "name": "lit_search_collabLearningHAT.txt",
+          "size_bytes": 746
         },
         {
           "name": "memory_loader.py",
           "size_bytes": 4924
+        },
+        {
+          "name": "readme.md",
+          "size_bytes": 162
+        },
+        {
+          "name": "readme_knowledgeSpace.md",
+          "size_bytes": 3826
+        },
+        {
+          "name": "readme_litReview.md",
+          "size_bytes": 5075
         },
         {
           "name": "requirements.txt",
@@ -96,12 +124,1950 @@
         },
         {
           "name": "run_assistant.py",
-          "size_bytes": 212
+          "size_bytes": 258
         }
       ]
     },
     {
-      "dir": "D:\\Post-doc Work\\Ailys\\.idea",
+      "dir": "C:\\Post-doc Work\\Ailys\\.git",
+      "dirs": [
+        "hooks",
+        "info",
+        "logs",
+        "objects",
+        "refs"
+      ],
+      "files": [
+        {
+          "name": "COMMIT_EDITMSG",
+          "size_bytes": 6
+        },
+        {
+          "name": "HEAD",
+          "size_bytes": 21
+        },
+        {
+          "name": "config",
+          "size_bytes": 301
+        },
+        {
+          "name": "description",
+          "size_bytes": 73
+        },
+        {
+          "name": "index",
+          "size_bytes": 8587
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\hooks",
+      "dirs": [],
+      "files": [
+        {
+          "name": "applypatch-msg.sample",
+          "size_bytes": 478
+        },
+        {
+          "name": "commit-msg.sample",
+          "size_bytes": 896
+        },
+        {
+          "name": "fsmonitor-watchman.sample",
+          "size_bytes": 4655
+        },
+        {
+          "name": "post-update.sample",
+          "size_bytes": 189
+        },
+        {
+          "name": "pre-applypatch.sample",
+          "size_bytes": 424
+        },
+        {
+          "name": "pre-commit.sample",
+          "size_bytes": 1643
+        },
+        {
+          "name": "pre-merge-commit.sample",
+          "size_bytes": 416
+        },
+        {
+          "name": "pre-push.sample",
+          "size_bytes": 1374
+        },
+        {
+          "name": "pre-rebase.sample",
+          "size_bytes": 4898
+        },
+        {
+          "name": "pre-receive.sample",
+          "size_bytes": 544
+        },
+        {
+          "name": "prepare-commit-msg.sample",
+          "size_bytes": 1492
+        },
+        {
+          "name": "push-to-checkout.sample",
+          "size_bytes": 2783
+        },
+        {
+          "name": "update.sample",
+          "size_bytes": 3650
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\info",
+      "dirs": [],
+      "files": [
+        {
+          "name": "exclude",
+          "size_bytes": 240
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\logs",
+      "dirs": [
+        "refs"
+      ],
+      "files": [
+        {
+          "name": "HEAD",
+          "size_bytes": 3755
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\logs\\refs",
+      "dirs": [
+        "heads",
+        "remotes"
+      ],
+      "files": []
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects",
+      "dirs": [
+        "00",
+        "02",
+        "03",
+        "04",
+        "08",
+        "09",
+        "0c",
+        "0f",
+        "10",
+        "12",
+        "17",
+        "18",
+        "19",
+        "1b",
+        "1d",
+        "1f",
+        "20",
+        "21",
+        "22",
+        "23",
+        "26",
+        "28",
+        "29",
+        "2b",
+        "2e",
+        "30",
+        "31",
+        "32",
+        "35",
+        "38",
+        "39",
+        "3b",
+        "40",
+        "41",
+        "43",
+        "44",
+        "45",
+        "48",
+        "49",
+        "4c",
+        "4d",
+        "4e",
+        "50",
+        "51",
+        "52",
+        "55",
+        "56",
+        "5c",
+        "62",
+        "65",
+        "66",
+        "68",
+        "69",
+        "6a",
+        "6b",
+        "6d",
+        "6e",
+        "70",
+        "71",
+        "74",
+        "75",
+        "77",
+        "78",
+        "79",
+        "7a",
+        "7b",
+        "7c",
+        "80",
+        "87",
+        "8c",
+        "8d",
+        "90",
+        "92",
+        "93",
+        "94",
+        "97",
+        "98",
+        "9a",
+        "9b",
+        "9c",
+        "9d",
+        "9e",
+        "a0",
+        "a1",
+        "a2",
+        "a4",
+        "a5",
+        "a7",
+        "a8",
+        "ab",
+        "ac",
+        "ad",
+        "ae",
+        "b0",
+        "b1",
+        "b2",
+        "b3",
+        "b5",
+        "b9",
+        "ba",
+        "bb",
+        "bd",
+        "be",
+        "c0",
+        "c2",
+        "c4",
+        "c5",
+        "c6",
+        "c8",
+        "c9",
+        "ca",
+        "cc",
+        "cf",
+        "d0",
+        "d1",
+        "d3",
+        "d4",
+        "d6",
+        "d8",
+        "dc",
+        "dd",
+        "de",
+        "df",
+        "e0",
+        "e1",
+        "e5",
+        "e6",
+        "e7",
+        "ea",
+        "eb",
+        "ec",
+        "ef",
+        "f0",
+        "f6",
+        "f7",
+        "f8",
+        "fa",
+        "fb",
+        "fd",
+        "ff",
+        "info",
+        "pack"
+      ],
+      "files": []
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\00",
+      "dirs": [],
+      "files": [
+        {
+          "name": "82e7cf5e4484ca602697f6752647ea7f4e6b32",
+          "size_bytes": 158
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\02",
+      "dirs": [],
+      "files": [
+        {
+          "name": "6d5def3ec176a9473cc1a564582478b0a777a4",
+          "size_bytes": 372
+        },
+        {
+          "name": "c1afbd8a734520119a449513fd71847951866e",
+          "size_bytes": 146
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\03",
+      "dirs": [],
+      "files": [
+        {
+          "name": "3e2eb57dcec8eabe93f0ae6f65f9fc043446a1",
+          "size_bytes": 2445
+        },
+        {
+          "name": "b34838b03b53463ca3a50de98b38bae0a3b98e",
+          "size_bytes": 3633
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\04",
+      "dirs": [],
+      "files": [
+        {
+          "name": "e7c52484dabb3b70c51f11954fed1039954f6c",
+          "size_bytes": 383222
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\08",
+      "dirs": [],
+      "files": [
+        {
+          "name": "654714f60f072479fd21dc1d908183f21db322",
+          "size_bytes": 60
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\09",
+      "dirs": [],
+      "files": [
+        {
+          "name": "cfdce0da7a1982229f557ab7e34f69f026baa9",
+          "size_bytes": 1350
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\0c",
+      "dirs": [],
+      "files": [
+        {
+          "name": "45bb4890dfac20eb37ed6055164e79af024247",
+          "size_bytes": 5605
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\0f",
+      "dirs": [],
+      "files": [
+        {
+          "name": "1a6eb0980ad1205b14cc6880d9f6c315d92cb9",
+          "size_bytes": 1846
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\10",
+      "dirs": [],
+      "files": [
+        {
+          "name": "5ce2da2d6447d11dfe32bfb846c3d5b199fc99",
+          "size_bytes": 142
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\12",
+      "dirs": [],
+      "files": [
+        {
+          "name": "aed7de34033324b56fbd46773a888bd3cbceb9",
+          "size_bytes": 580
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\17",
+      "dirs": [],
+      "files": [
+        {
+          "name": "65bb5c7b6e58b571fafb3598906e69551df014",
+          "size_bytes": 373
+        },
+        {
+          "name": "c1b1ab818f9bfe2eb64c60096fe7e17d29ec93",
+          "size_bytes": 1318
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\18",
+      "dirs": [],
+      "files": [
+        {
+          "name": "6ab843019dc2f484eeab7e1ad749585d4bedb9",
+          "size_bytes": 230
+        },
+        {
+          "name": "e0bd6b76e7c737d4108ab30088b2094e9e6460",
+          "size_bytes": 178
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\19",
+      "dirs": [],
+      "files": [
+        {
+          "name": "c5bd1ce799d4f9b0db37457fbe1069e03b038f",
+          "size_bytes": 151
+        },
+        {
+          "name": "dfbab65ed148f353cc4f3afb950b31cedfc1e6",
+          "size_bytes": 232
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\1b",
+      "dirs": [],
+      "files": [
+        {
+          "name": "242d6ef5676f569b1dcfd7a62e5331635d7e2f",
+          "size_bytes": 6370
+        },
+        {
+          "name": "e08bc14b16a653438517b4977df1a5ac158a96",
+          "size_bytes": 2296
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\1d",
+      "dirs": [],
+      "files": [
+        {
+          "name": "52949ef56154d9de812492e35603b2ba6a8d46",
+          "size_bytes": 178
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\1f",
+      "dirs": [],
+      "files": [
+        {
+          "name": "15971cfca31ea5d8a5b30a1a7dd2613f4e28bf",
+          "size_bytes": 729
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\20",
+      "dirs": [],
+      "files": [
+        {
+          "name": "47ed3fb27803f66b8f756b310ba9830730e328",
+          "size_bytes": 61
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\21",
+      "dirs": [],
+      "files": [
+        {
+          "name": "4dfb468e957e6daef29857dd14c8b5a5c9f65b",
+          "size_bytes": 401
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\22",
+      "dirs": [],
+      "files": [
+        {
+          "name": "fde5c443e8c15a25c66660d560268e7788fdb1",
+          "size_bytes": 255
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\23",
+      "dirs": [],
+      "files": [
+        {
+          "name": "436ab618738d2e61c196eb1f004dcea8336ff1",
+          "size_bytes": 4165
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\26",
+      "dirs": [],
+      "files": [
+        {
+          "name": "d33521af10bcc7fd8cea344038eaaeb78d0ef5",
+          "size_bytes": 63
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\28",
+      "dirs": [],
+      "files": [
+        {
+          "name": "d41f32e0b78ab8f717dbc7f8ffb8439e442803",
+          "size_bytes": 1176
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\29",
+      "dirs": [],
+      "files": [
+        {
+          "name": "bc6b3948c5f4d78e4dc151a25a2f083bb580fc",
+          "size_bytes": 60
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\2b",
+      "dirs": [],
+      "files": [
+        {
+          "name": "560d55139306e9285f38cc37687c5bed3e7995",
+          "size_bytes": 59
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\2e",
+      "dirs": [],
+      "files": [
+        {
+          "name": "2fc9aaf37868f08c53cb9aa1faffd6b4638e31",
+          "size_bytes": 770
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\30",
+      "dirs": [],
+      "files": [
+        {
+          "name": "0a7e27490525c1c2d883378ee0fe637d8f79b6",
+          "size_bytes": 132
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\31",
+      "dirs": [],
+      "files": [
+        {
+          "name": "ca5482698eae8f90c866890651ed4897c8d67a",
+          "size_bytes": 578
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\32",
+      "dirs": [],
+      "files": [
+        {
+          "name": "4db7400018dc636e0d2349bb0e0ec4dcb34031",
+          "size_bytes": 744
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\35",
+      "dirs": [],
+      "files": [
+        {
+          "name": "532ef8c37312f4085aa11e850df233dc8f1f93",
+          "size_bytes": 164
+        },
+        {
+          "name": "7f5cc8dcfbbf5e1691312f7ee5f6ed4362a404",
+          "size_bytes": 61
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\38",
+      "dirs": [],
+      "files": [
+        {
+          "name": "31374d0ee4059e5ee5bd5453de7c5ebdc6a86a",
+          "size_bytes": 2570
+        },
+        {
+          "name": "a2f3419b8de3ed164bedaefa7bae77f83767d5",
+          "size_bytes": 2942
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\39",
+      "dirs": [],
+      "files": [
+        {
+          "name": "cdd55aa210d95860d897e2f988bcfa6fe689ee",
+          "size_bytes": 95
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\3b",
+      "dirs": [],
+      "files": [
+        {
+          "name": "2a84e9b2cbd1b76ad21f99aeabee9c47aafe62",
+          "size_bytes": 7505
+        },
+        {
+          "name": "6964e6c4fe4514cb8e855d00911bb8e3e7ceb4",
+          "size_bytes": 5458
+        },
+        {
+          "name": "989f80707531fd75d503bfeb69944a25df9d13",
+          "size_bytes": 578
+        },
+        {
+          "name": "b436165e1890b335210221c2671f2aefdbc95d",
+          "size_bytes": 177
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\40",
+      "dirs": [],
+      "files": [
+        {
+          "name": "19e5a5a19142576b18a9d9aed32e2b193594eb",
+          "size_bytes": 91
+        },
+        {
+          "name": "7e3e781b40e04ff09d792ca9624c6a9c5ba586",
+          "size_bytes": 1674
+        },
+        {
+          "name": "c4fbfb43cb68a3b1c2e23966d91420b0b79ecd",
+          "size_bytes": 10928
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\41",
+      "dirs": [],
+      "files": [
+        {
+          "name": "2e1af9684fe8117bfc43f498dde3e803cbd16e",
+          "size_bytes": 11898
+        },
+        {
+          "name": "692d2f4cc0a205572a464391343b7de44d38b2",
+          "size_bytes": 59
+        },
+        {
+          "name": "e380b26b40d55373a06b57fc14a60b66fa29d7",
+          "size_bytes": 372
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\43",
+      "dirs": [],
+      "files": [
+        {
+          "name": "1162f9e8d3d6f7dea4973212e16552de271d85",
+          "size_bytes": 120
+        },
+        {
+          "name": "5e0186bbbc07d94ff27a2b112f147a952e3e94",
+          "size_bytes": 11286
+        },
+        {
+          "name": "dc7fbe44e9fbb6ed8a78c0dd1700627812d5f9",
+          "size_bytes": 12691
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\44",
+      "dirs": [],
+      "files": [
+        {
+          "name": "c9a33a2c6cd948d383d59b3cb2d613e9a084a8",
+          "size_bytes": 51
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\45",
+      "dirs": [],
+      "files": [
+        {
+          "name": "86c3e0d69c2c0bb42df71dfa5bfab51c7c2a04",
+          "size_bytes": 60
+        },
+        {
+          "name": "dda9f0aca6abee756b60da8db489fe41e06ac5",
+          "size_bytes": 679
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\48",
+      "dirs": [],
+      "files": [
+        {
+          "name": "3db053959dbfd27eb784f9e2e5dd8910c79def",
+          "size_bytes": 329
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\49",
+      "dirs": [],
+      "files": [
+        {
+          "name": "458cce4c7d6c45c3701b61cb1e711e53ef63f8",
+          "size_bytes": 231
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\4c",
+      "dirs": [],
+      "files": [
+        {
+          "name": "8635525a955214afaf899f30614373dc1fc637",
+          "size_bytes": 215
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\4d",
+      "dirs": [],
+      "files": [
+        {
+          "name": "5bd8c8135dae86fc8db93a9154e9be9f8d5257",
+          "size_bytes": 2299
+        },
+        {
+          "name": "a6f6a0b1da2a7702d8ef89fc20e46d444e1722",
+          "size_bytes": 119
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\4e",
+      "dirs": [],
+      "files": [
+        {
+          "name": "72738f8954cfa0bffecf5f6712399b39832e91",
+          "size_bytes": 32
+        },
+        {
+          "name": "7313868aa0943e4cbd6cd13c2dc11c859e8055",
+          "size_bytes": 99
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\50",
+      "dirs": [],
+      "files": [
+        {
+          "name": "2ded6fdb017ef689bd1739828e7fb922876f20",
+          "size_bytes": 191
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\51",
+      "dirs": [],
+      "files": [
+        {
+          "name": "b3977513aed338256de9b7d34a0751c0749cf7",
+          "size_bytes": 6284
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\52",
+      "dirs": [],
+      "files": [
+        {
+          "name": "47d0ab9dd0e3345584c2310b98e6cdde23d4bb",
+          "size_bytes": 59
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\55",
+      "dirs": [],
+      "files": [
+        {
+          "name": "7821ffa2d5416b51b7cba2f2549ea9a1dbbac2",
+          "size_bytes": 373
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\56",
+      "dirs": [],
+      "files": [
+        {
+          "name": "a896bb4213bbe4e8c7442699e8dc7877d304f5",
+          "size_bytes": 210
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\5c",
+      "dirs": [],
+      "files": [
+        {
+          "name": "af84bdca546f8da9b34f43776e8a4655165f2e",
+          "size_bytes": 635
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\62",
+      "dirs": [],
+      "files": [
+        {
+          "name": "a31ca6fb2d89d221885126c883e5c10c2ce836",
+          "size_bytes": 51
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\65",
+      "dirs": [],
+      "files": [
+        {
+          "name": "50cceeffdb2db0596dea65ecfca0ffda4c67b1",
+          "size_bytes": 51
+        },
+        {
+          "name": "8ddb25c7ea5e4ef166369e7d0ae03584d8bcc9",
+          "size_bytes": 171
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\66",
+      "dirs": [],
+      "files": [
+        {
+          "name": "5a4486ee194d9a503cb10eda5ec999e38a6ad9",
+          "size_bytes": 275
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\68",
+      "dirs": [],
+      "files": [
+        {
+          "name": "63387cbaf466dbae5dd0a48ae258b257f9802e",
+          "size_bytes": 4241
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\69",
+      "dirs": [],
+      "files": [
+        {
+          "name": "73b618a1587f1396fbc688a5867dbf5b3bf90a",
+          "size_bytes": 134
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\6a",
+      "dirs": [],
+      "files": [
+        {
+          "name": "4bf3568908d7fa976cad7e7f94e3bd06f53a73",
+          "size_bytes": 91
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\6b",
+      "dirs": [],
+      "files": [
+        {
+          "name": "15f028bacaee3ef5f3f7b19a4239773e1a583d",
+          "size_bytes": 235
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\6d",
+      "dirs": [],
+      "files": [
+        {
+          "name": "883506a24b2c26af98338f8307d156303a831b",
+          "size_bytes": 578
+        },
+        {
+          "name": "e764c8bd2048eb65ea4b30e40ecc39ed3a51f9",
+          "size_bytes": 770
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\6e",
+      "dirs": [],
+      "files": [
+        {
+          "name": "991ad5a069417501745bca253bb29b6c3a8b3e",
+          "size_bytes": 771
+        },
+        {
+          "name": "a8cfe5ab37c71a2a6db980ba43c31fc51464ab",
+          "size_bytes": 133
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\70",
+      "dirs": [],
+      "files": [
+        {
+          "name": "88b9d766ebd5ee9503653151d4092a9696d8da",
+          "size_bytes": 2844
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\71",
+      "dirs": [],
+      "files": [
+        {
+          "name": "d6adce4870bd406d469dfb2a0facb7daa7e788",
+          "size_bytes": 368
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\74",
+      "dirs": [],
+      "files": [
+        {
+          "name": "0af455e784ea29c5ad7037de7949cb4d492062",
+          "size_bytes": 83
+        },
+        {
+          "name": "d515a027de98657e9d3d5f0f1831882fd81374",
+          "size_bytes": 235
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\75",
+      "dirs": [],
+      "files": [
+        {
+          "name": "bc9842fd533a02290b96c5d6103e98c6bb5d4b",
+          "size_bytes": 230
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\77",
+      "dirs": [],
+      "files": [
+        {
+          "name": "250defea89469f1b2057d6ece069e4ff1b9263",
+          "size_bytes": 247
+        },
+        {
+          "name": "716d1ae07b719c33db12a5e19bf967a8c8c0f3",
+          "size_bytes": 286
+        },
+        {
+          "name": "79f083950c06d1bd17951e321e1f21994463d2",
+          "size_bytes": 5963
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\78",
+      "dirs": [],
+      "files": [
+        {
+          "name": "733a2f9213f20c98d7d2570dbe1b57b755f599",
+          "size_bytes": 61
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\79",
+      "dirs": [],
+      "files": [
+        {
+          "name": "cb3d108499aa33b55226eed64ac90a277160b6",
+          "size_bytes": 2456
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\7a",
+      "dirs": [],
+      "files": [
+        {
+          "name": "ea436845eb651c0edc3e155b5bc5ed184ae8fe",
+          "size_bytes": 1201
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\7b",
+      "dirs": [],
+      "files": [
+        {
+          "name": "8c06e833846b2fdc60fdc5024d0216578511b9",
+          "size_bytes": 2459
+        },
+        {
+          "name": "c265f552a2a36740f70c1b80b3685ad12bf298",
+          "size_bytes": 165
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\7c",
+      "dirs": [],
+      "files": [
+        {
+          "name": "653f21f28d39befe41b0b45d779f91cfc252f3",
+          "size_bytes": 11282
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\80",
+      "dirs": [],
+      "files": [
+        {
+          "name": "50d9cf13bfc5fd4d4cfe3ea732f6db7ef0c15d",
+          "size_bytes": 830
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\87",
+      "dirs": [],
+      "files": [
+        {
+          "name": "c317e7262515c83c9a16d4515eab73599c81c5",
+          "size_bytes": 232
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\8c",
+      "dirs": [],
+      "files": [
+        {
+          "name": "239d1506bfed256e9fb1762d1285f459d747a0",
+          "size_bytes": 770
+        },
+        {
+          "name": "d2f90562be0a8fd8bb55c0d5e994ad1191d7e0",
+          "size_bytes": 578
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\8d",
+      "dirs": [],
+      "files": [
+        {
+          "name": "043dc79606e8c425d34ad369cad95a717ceb92",
+          "size_bytes": 233
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\90",
+      "dirs": [],
+      "files": [
+        {
+          "name": "84fcb0e9c6bc6707831c0be0712d78a5d670ef",
+          "size_bytes": 184
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\92",
+      "dirs": [],
+      "files": [
+        {
+          "name": "fb184e9100c93375e1c8a521b2025752023f1a",
+          "size_bytes": 1322
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\93",
+      "dirs": [],
+      "files": [
+        {
+          "name": "2931c33b8cd981f89585e54f51b3b522249331",
+          "size_bytes": 848
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\94",
+      "dirs": [],
+      "files": [
+        {
+          "name": "a25f7f4cb416c083d265558da75d457237d671",
+          "size_bytes": 155
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\97",
+      "dirs": [],
+      "files": [
+        {
+          "name": "7a5251ac1ed12dff720cc78c1330b084549530",
+          "size_bytes": 4108
+        },
+        {
+          "name": "824ec9b0149e48c91dce4fee530335b327c686",
+          "size_bytes": 66
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\98",
+      "dirs": [],
+      "files": [
+        {
+          "name": "c0de56afcf1205d1ae996c2aac16afbcb54401",
+          "size_bytes": 170
+        },
+        {
+          "name": "c22b5eb2cfed7b3c1275143acdec643dd8f7d4",
+          "size_bytes": 397
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\9a",
+      "dirs": [],
+      "files": [
+        {
+          "name": "23885de10584da69159c245ed7fd1e7c4f04bf",
+          "size_bytes": 216
+        },
+        {
+          "name": "bda8abdc2b698a1bf1defd35c2db543aa0c537",
+          "size_bytes": 770
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\9b",
+      "dirs": [],
+      "files": [
+        {
+          "name": "baf6bbd9ed9e410908dbe51db7770bd334647e",
+          "size_bytes": 281
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\9c",
+      "dirs": [],
+      "files": [
+        {
+          "name": "1dd73a3ff20bfd5df5c0daddbe7c827c9b70d2",
+          "size_bytes": 743
+        },
+        {
+          "name": "525034828d03a92f77c25fbef126d58d47ca04",
+          "size_bytes": 230
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\9d",
+      "dirs": [],
+      "files": [
+        {
+          "name": "862a1cde6d5cf73e1d44162bcf895fed5a8fd8",
+          "size_bytes": 114
+        },
+        {
+          "name": "a6ca9384444ccba91441cadcce950e4f7e12ee",
+          "size_bytes": 171
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\9e",
+      "dirs": [],
+      "files": [
+        {
+          "name": "12e0e795daf26144a2fecf0772ed8285dc9ec8",
+          "size_bytes": 91
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\a0",
+      "dirs": [],
+      "files": [
+        {
+          "name": "3be8bc89c55bfa717063c53fa99265ae1b6ce4",
+          "size_bytes": 228
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\a1",
+      "dirs": [],
+      "files": [
+        {
+          "name": "dd3978010004775d89791afdeecf4445407e50",
+          "size_bytes": 187
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\a2",
+      "dirs": [],
+      "files": [
+        {
+          "name": "6f68c2b7a83220dad69fa62db5a995d2da466a",
+          "size_bytes": 1659
+        },
+        {
+          "name": "787445f863be939491dfe9e5a94721125acdb9",
+          "size_bytes": 4392
+        },
+        {
+          "name": "9457d3eb7f02c4c8edde8d7b07ead3a67ef06f",
+          "size_bytes": 376
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\a4",
+      "dirs": [],
+      "files": [
+        {
+          "name": "4882eed12abad13ade75a6a4a496a67292f844",
+          "size_bytes": 2379
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\a5",
+      "dirs": [],
+      "files": [
+        {
+          "name": "024f86d29aa18be29831630447b7f571d0d601",
+          "size_bytes": 648
+        },
+        {
+          "name": "1ec5b4db181b53371a9d71d76d4af7e6db8a87",
+          "size_bytes": 220
+        },
+        {
+          "name": "2e58fd69cbe04ba9908f6331e64ae37bbebbca",
+          "size_bytes": 73
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\a7",
+      "dirs": [],
+      "files": [
+        {
+          "name": "798a5f0ba9922df49e34e625b0d0b7c83ae4b7",
+          "size_bytes": 713
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\a8",
+      "dirs": [],
+      "files": [
+        {
+          "name": "292135a44bbab2d21ae9d3d41535b46fcf1918",
+          "size_bytes": 772
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\ab",
+      "dirs": [],
+      "files": [
+        {
+          "name": "19c206dad64b16e7494fe739526b2ec31d619f",
+          "size_bytes": 2999
+        },
+        {
+          "name": "1a08817f444f867ad26c30f56b59582390585a",
+          "size_bytes": 462
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\ac",
+      "dirs": [],
+      "files": [
+        {
+          "name": "607527578131a40aca83e9e71a47dbf4cfb91f",
+          "size_bytes": 171
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\ad",
+      "dirs": [],
+      "files": [
+        {
+          "name": "27c87d0764d07e0db53c8dba64be685f202b8b",
+          "size_bytes": 1022
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\ae",
+      "dirs": [],
+      "files": [
+        {
+          "name": "47f3388b601bab12fb742d25c8dac4d5c0af66",
+          "size_bytes": 295
+        },
+        {
+          "name": "cb76752fd8a7b19cf86ec4c2eea68e66d24c62",
+          "size_bytes": 2018
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\b0",
+      "dirs": [],
+      "files": [
+        {
+          "name": "a3cb549bb8288602b8852ebbed78f77a63e86a",
+          "size_bytes": 1802
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\b1",
+      "dirs": [],
+      "files": [
+        {
+          "name": "018b47232628636523b33c2709168479686292",
+          "size_bytes": 224
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\b2",
+      "dirs": [],
+      "files": [
+        {
+          "name": "eb18c567397058e4ced2d7d25e1b0ed055b2d1",
+          "size_bytes": 189
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\b3",
+      "dirs": [],
+      "files": [
+        {
+          "name": "50e251ca89b6b0a11a6d7ad0c6e6cccace5e5b",
+          "size_bytes": 363
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\b5",
+      "dirs": [],
+      "files": [
+        {
+          "name": "43f3f9de4fcf665b49a659269d5fe92d81a66c",
+          "size_bytes": 4505
+        },
+        {
+          "name": "9e8cb3f38cb1c005b66f77e74d2955806c8aa0",
+          "size_bytes": 2456
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\b9",
+      "dirs": [],
+      "files": [
+        {
+          "name": "fc96127c39bba2fc6265c70cebf5548bf4baf5",
+          "size_bytes": 184
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\ba",
+      "dirs": [],
+      "files": [
+        {
+          "name": "74ab001f3f583a8a16132574a07125a69a75e3",
+          "size_bytes": 111
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\bb",
+      "dirs": [],
+      "files": [
+        {
+          "name": "ff6769d6b61d99731d17bd6101b753b5a80466",
+          "size_bytes": 298
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\bd",
+      "dirs": [],
+      "files": [
+        {
+          "name": "38fe515c781ecfa476d3409bde78b43169e9fe",
+          "size_bytes": 2048
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\be",
+      "dirs": [],
+      "files": [
+        {
+          "name": "9fe2426e2ede0a094dd17d8889b74573fe9f51",
+          "size_bytes": 239
+        },
+        {
+          "name": "a71a3de191ad919840ab7bf1eaeb4bec309402",
+          "size_bytes": 167
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\c0",
+      "dirs": [],
+      "files": [
+        {
+          "name": "1d6cbae3105037a943e704b0183a2a99614076",
+          "size_bytes": 612
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\c2",
+      "dirs": [],
+      "files": [
+        {
+          "name": "aebc4c4883be45d57e804f84f262fad186f53a",
+          "size_bytes": 847
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\c4",
+      "dirs": [],
+      "files": [
+        {
+          "name": "218df142249bc5fcd31701e0fc633b7f86c0d0",
+          "size_bytes": 1011
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\c5",
+      "dirs": [],
+      "files": [
+        {
+          "name": "35df1e02f17cec800356fea21e990667f18925",
+          "size_bytes": 770
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\c6",
+      "dirs": [],
+      "files": [
+        {
+          "name": "133ba71a50204372a23ac2096b49f3c4a3b604",
+          "size_bytes": 386
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\c8",
+      "dirs": [],
+      "files": [
+        {
+          "name": "1ba82c1260ba2a45c7a0f4aa80aabb12c9109e",
+          "size_bytes": 578
+        },
+        {
+          "name": "efd9ccd0b32c0f29533890935f7b8fff8c1bf6",
+          "size_bytes": 230
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\c9",
+      "dirs": [],
+      "files": [
+        {
+          "name": "7c8be3274e392b0cbb52bd1a0f39493977e58c",
+          "size_bytes": 191
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\ca",
+      "dirs": [],
+      "files": [
+        {
+          "name": "06513ec1582a69945e99fa3bef3301cfb99855",
+          "size_bytes": 134
+        },
+        {
+          "name": "0da63bfc853f7c0d9232eaf8e9e945320dd115",
+          "size_bytes": 172
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\cc",
+      "dirs": [],
+      "files": [
+        {
+          "name": "3be8dbd42ff6173d7c04ffc404095524798685",
+          "size_bytes": 257
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\cf",
+      "dirs": [],
+      "files": [
+        {
+          "name": "e770b98f55c637f23fb2bb6068e8d1e7b232e7",
+          "size_bytes": 770
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\d0",
+      "dirs": [],
+      "files": [
+        {
+          "name": "4895d44428a2d52be7acfeafba8b3c1eef1633",
+          "size_bytes": 12413
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\d1",
+      "dirs": [],
+      "files": [
+        {
+          "name": "6d3d617f7ca14a7eb0c57de926a6a6e82940eb",
+          "size_bytes": 3268
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\d3",
+      "dirs": [],
+      "files": [
+        {
+          "name": "15c009412eee4509787bdfcd029d4838f2f050",
+          "size_bytes": 714
+        },
+        {
+          "name": "3b27f1151905c230d2482ac57fe9587e22bef6",
+          "size_bytes": 155
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\d4",
+      "dirs": [],
+      "files": [
+        {
+          "name": "5fb919fd7079e6fb4cb16cd18c939ae8a61129",
+          "size_bytes": 373
+        },
+        {
+          "name": "b12f321d0246c166cb4b33e7c77ec60a7664bd",
+          "size_bytes": 189
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\d6",
+      "dirs": [],
+      "files": [
+        {
+          "name": "5803f8f102f0ae4f3380ca6c05d906e681ead3",
+          "size_bytes": 5951
+        },
+        {
+          "name": "bb3ffd44dd1aefffaf956b1758da9ec8b7cc8c",
+          "size_bytes": 372
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\d8",
+      "dirs": [],
+      "files": [
+        {
+          "name": "043e6d2af494c9accb188d0de810c978c001d3",
+          "size_bytes": 116472
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\dc",
+      "dirs": [],
+      "files": [
+        {
+          "name": "54c84d5016c33d17d1c235e8f9cedf6835a1e9",
+          "size_bytes": 6152
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\dd",
+      "dirs": [],
+      "files": [
+        {
+          "name": "3c99d662f94432c2a1b04ab0ec14c86f1265e1",
+          "size_bytes": 713
+        },
+        {
+          "name": "9cd1c57b5a88e7f4776d62390e1f7c41aa04cc",
+          "size_bytes": 90
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\de",
+      "dirs": [],
+      "files": [
+        {
+          "name": "795c5055fb8d138fec5b1d73c35c320c499320",
+          "size_bytes": 4850
+        },
+        {
+          "name": "d37c7c5dc8dad9a8b431d6afdb01131a2a13a0",
+          "size_bytes": 478
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\df",
+      "dirs": [],
+      "files": [
+        {
+          "name": "71c25d4a464688f09510e9d9769985f4d1d24c",
+          "size_bytes": 507
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\e0",
+      "dirs": [],
+      "files": [
+        {
+          "name": "787fc88b895e38b999c0f57c5c1de67ab9dfdc",
+          "size_bytes": 772
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\e1",
+      "dirs": [],
+      "files": [
+        {
+          "name": "be02284b025037cdf5bb7c3f6adbbd759952dc",
+          "size_bytes": 21117
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\e5",
+      "dirs": [],
+      "files": [
+        {
+          "name": "f978b417f9ae963c409ba5614f20480282c4de",
+          "size_bytes": 642
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\e6",
+      "dirs": [],
+      "files": [
+        {
+          "name": "9de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+          "size_bytes": 15
+        },
+        {
+          "name": "d58c83695d922d6bf6b95283f9340a638447ba",
+          "size_bytes": 336
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\e7",
+      "dirs": [],
+      "files": [
+        {
+          "name": "0bf4e6f5b09d91f56fb66a8c2a4ef0f8e9485d",
+          "size_bytes": 1546278
+        },
+        {
+          "name": "f88ff384e2782e0ff96b079c814e1932c2c8c0",
+          "size_bytes": 163
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\ea",
+      "dirs": [],
+      "files": [
+        {
+          "name": "3b87486d62cb5fa1e2ee54ef315b81e59abfe2",
+          "size_bytes": 578
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\eb",
+      "dirs": [],
+      "files": [
+        {
+          "name": "f328ab158e4fa9cc23072360829633dffe6b15",
+          "size_bytes": 360
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\ec",
+      "dirs": [],
+      "files": [
+        {
+          "name": "53ee6778d4995833e796a8415a5d69c99e23ec",
+          "size_bytes": 18829
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\ef",
+      "dirs": [],
+      "files": [
+        {
+          "name": "597f5b301b8a93ad802658e40bc59f32da6ed5",
+          "size_bytes": 3068
+        },
+        {
+          "name": "8fed7cc063e2ad026fcdea2831973129a368b8",
+          "size_bytes": 2586
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\f0",
+      "dirs": [],
+      "files": [
+        {
+          "name": "fb303983ab2ee48198d8d5c86a3759911f9e97",
+          "size_bytes": 564
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\f6",
+      "dirs": [],
+      "files": [
+        {
+          "name": "259c90d2940cbc64db88c3cbbfdf66e84b4a78",
+          "size_bytes": 363
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\f7",
+      "dirs": [],
+      "files": [
+        {
+          "name": "8e9d9428fecb4338bf80eedcd53421e91547cc",
+          "size_bytes": 60
+        },
+        {
+          "name": "c9b644b268f404ee6917f10bffbebe686f263d",
+          "size_bytes": 13199
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\f8",
+      "dirs": [],
+      "files": [
+        {
+          "name": "b087fbd1a356db8682985717211ba88cc9023c",
+          "size_bytes": 6230
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\fa",
+      "dirs": [],
+      "files": [
+        {
+          "name": "8d47263b0fc0d909a61dc9aa60e078d2aa4f94",
+          "size_bytes": 673
+        },
+        {
+          "name": "f8825c53b794c96dc0be4a5e1fa83091dba96c",
+          "size_bytes": 626
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\fb",
+      "dirs": [],
+      "files": [
+        {
+          "name": "c615ca9f9d7206012fdf4a461a7c9a40ab798a",
+          "size_bytes": 1941
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\fd",
+      "dirs": [],
+      "files": [
+        {
+          "name": "1081c92232bbf263b1e647fc5449652eebaba4",
+          "size_bytes": 230
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\ff",
+      "dirs": [],
+      "files": [
+        {
+          "name": "bed38d991e5a9f7d2da0f28a53a439bf7c357f",
+          "size_bytes": 373
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\info",
+      "dirs": [],
+      "files": []
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\objects\\pack",
+      "dirs": [],
+      "files": []
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\refs",
+      "dirs": [
+        "heads",
+        "remotes",
+        "tags"
+      ],
+      "files": []
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\refs\\heads",
+      "dirs": [],
+      "files": [
+        {
+          "name": "main",
+          "size_bytes": 41
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\refs\\remotes",
+      "dirs": [
+        "origin"
+      ],
+      "files": []
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.git\\refs\\tags",
+      "dirs": [],
+      "files": []
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.github",
+      "dirs": [
+        "workflows"
+      ],
+      "files": []
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.github\\workflows",
+      "dirs": [],
+      "files": [
+        {
+          "name": "context-pack.yml",
+          "size_bytes": 1244
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\.idea",
       "dirs": [
         "inspectionProfiles"
       ],
@@ -116,7 +2082,7 @@
         },
         {
           "name": "misc.xml",
-          "size_bytes": 201
+          "size_bytes": 197
         },
         {
           "name": "modular_assistant.iml",
@@ -127,13 +2093,17 @@
           "size_bytes": 293
         },
         {
+          "name": "vcs.xml",
+          "size_bytes": 185
+        },
+        {
           "name": "workspace.xml",
-          "size_bytes": 6728
+          "size_bytes": 13553
         }
       ]
     },
     {
-      "dir": "D:\\Post-doc Work\\Ailys\\.idea\\inspectionProfiles",
+      "dir": "C:\\Post-doc Work\\Ailys\\.idea\\inspectionProfiles",
       "dirs": [],
       "files": [
         {
@@ -143,7 +2113,7 @@
       ]
     },
     {
-      "dir": "D:\\Post-doc Work\\Ailys\\__pycache__",
+      "dir": "C:\\Post-doc Work\\Ailys\\__pycache__",
       "dirs": [],
       "files": [
         {
@@ -157,10 +2127,16 @@
       ]
     },
     {
-      "dir": "D:\\Post-doc Work\\Ailys\\core",
+      "dir": "C:\\Post-doc Work\\Ailys\\ai_context",
+      "dirs": [],
+      "files": []
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\core",
       "dirs": [
         "__pycache__",
-        "knowledge_space"
+        "knowledge_space",
+        "lit"
       ],
       "files": [
         {
@@ -169,7 +2145,11 @@
         },
         {
           "name": "approval_queue.py",
-          "size_bytes": 2853
+          "size_bytes": 9841
+        },
+        {
+          "name": "artificial_cognition.py",
+          "size_bytes": 25216
         },
         {
           "name": "assistant.py",
@@ -178,6 +2158,10 @@
         {
           "name": "batch.py",
           "size_bytes": 805
+        },
+        {
+          "name": "config.py",
+          "size_bytes": 2673
         },
         {
           "name": "pdf_reader.py",
@@ -190,7 +2174,7 @@
       ]
     },
     {
-      "dir": "D:\\Post-doc Work\\Ailys\\core\\__pycache__",
+      "dir": "C:\\Post-doc Work\\Ailys\\core\\__pycache__",
       "dirs": [],
       "files": [
         {
@@ -207,7 +2191,11 @@
         },
         {
           "name": "approval_queue.cpython-311.pyc",
-          "size_bytes": 6650
+          "size_bytes": 16906
+        },
+        {
+          "name": "artificial_cognition.cpython-311.pyc",
+          "size_bytes": 29685
         },
         {
           "name": "assistant.cpython-311.pyc",
@@ -220,6 +2208,10 @@
         {
           "name": "batch.cpython-311.pyc",
           "size_bytes": 1661
+        },
+        {
+          "name": "config.cpython-311.pyc",
+          "size_bytes": 4569
         },
         {
           "name": "pdf_reader.cpython-310.pyc",
@@ -236,7 +2228,7 @@
       ]
     },
     {
-      "dir": "D:\\Post-doc Work\\Ailys\\core\\knowledge_space",
+      "dir": "C:\\Post-doc Work\\Ailys\\core\\knowledge_space",
       "dirs": [
         "__pycache__"
       ],
@@ -250,12 +2242,8 @@
           "size_bytes": 13369
         },
         {
-          "name": "export_backup.py",
-          "size_bytes": 10644
-        },
-        {
           "name": "ingest.py",
-          "size_bytes": 7559
+          "size_bytes": 8801
         },
         {
           "name": "models.py",
@@ -271,7 +2259,7 @@
         },
         {
           "name": "sniffers.py",
-          "size_bytes": 4118
+          "size_bytes": 6602
         },
         {
           "name": "storage.py",
@@ -288,7 +2276,7 @@
       ]
     },
     {
-      "dir": "D:\\Post-doc Work\\Ailys\\core\\knowledge_space\\__pycache__",
+      "dir": "C:\\Post-doc Work\\Ailys\\core\\knowledge_space\\__pycache__",
       "dirs": [],
       "files": [
         {
@@ -300,16 +2288,24 @@
           "size_bytes": 419
         },
         {
+          "name": "export.cpython-311.pyc",
+          "size_bytes": 19554
+        },
+        {
           "name": "ingest.cpython-310.pyc",
           "size_bytes": 5096
         },
         {
           "name": "ingest.cpython-311.pyc",
-          "size_bytes": 10273
+          "size_bytes": 11567
         },
         {
           "name": "participants.cpython-311.pyc",
           "size_bytes": 5607
+        },
+        {
+          "name": "paths.cpython-311.pyc",
+          "size_bytes": 3904
         },
         {
           "name": "sniffers.cpython-310.pyc",
@@ -317,7 +2313,7 @@
         },
         {
           "name": "sniffers.cpython-311.pyc",
-          "size_bytes": 6728
+          "size_bytes": 9176
         },
         {
           "name": "storage.cpython-310.pyc",
@@ -341,31 +2337,57 @@
         },
         {
           "name": "viz.cpython-311.pyc",
-          "size_bytes": 16262
+          "size_bytes": 19287
         }
       ]
     },
     {
-      "dir": "D:\\Post-doc Work\\Ailys\\data",
+      "dir": "C:\\Post-doc Work\\Ailys\\core\\lit",
+      "dirs": [
+        "__pycache__"
+      ],
+      "files": [
+        {
+          "name": "sources.py",
+          "size_bytes": 10077
+        },
+        {
+          "name": "utils.py",
+          "size_bytes": 1349
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\core\\lit\\__pycache__",
+      "dirs": [],
+      "files": [
+        {
+          "name": "utils.cpython-311.pyc",
+          "size_bytes": 4095
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\data",
       "dirs": [
         "knowledge_space"
       ],
       "files": []
     },
     {
-      "dir": "D:\\Post-doc Work\\Ailys\\data\\knowledge_space",
+      "dir": "C:\\Post-doc Work\\Ailys\\data\\knowledge_space",
       "dirs": [
         "snapshots"
       ],
       "files": [
         {
           "name": "knowledge_space.db",
-          "size_bytes": 21213184
+          "size_bytes": 30289920
         }
       ]
     },
     {
-      "dir": "D:\\Post-doc Work\\Ailys\\data\\knowledge_space\\snapshots",
+      "dir": "C:\\Post-doc Work\\Ailys\\data\\knowledge_space\\snapshots",
       "dirs": [],
       "files": [
         {
@@ -755,23 +2777,33 @@
       ]
     },
     {
-      "dir": "D:\\Post-doc Work\\Ailys\\gui",
+      "dir": "C:\\Post-doc Work\\Ailys\\dist",
+      "dirs": [],
+      "files": [
+        {
+          "name": "CODEMAP-20251015-170427.md",
+          "size_bytes": 1961
+        },
+        {
+          "name": "ailys-context-20251015-170427.zip",
+          "size_bytes": 119453
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\gui",
       "dirs": [
         "__pycache__"
       ],
       "files": [
         {
           "name": "main_window.py",
-          "size_bytes": 30907
-        },
-        {
-          "name": "main_window_backup.py",
-          "size_bytes": 24721
+          "size_bytes": 51418
         }
       ]
     },
     {
-      "dir": "D:\\Post-doc Work\\Ailys\\gui\\__pycache__",
+      "dir": "C:\\Post-doc Work\\Ailys\\gui\\__pycache__",
       "dirs": [],
       "files": [
         {
@@ -780,14 +2812,15 @@
         },
         {
           "name": "main_window.cpython-311.pyc",
-          "size_bytes": 51282
+          "size_bytes": 80759
         }
       ]
     },
     {
-      "dir": "D:\\Post-doc Work\\Ailys\\memory",
+      "dir": "C:\\Post-doc Work\\Ailys\\memory",
       "dirs": [
-        "__pycache__"
+        "__pycache__",
+        "exchanges"
       ],
       "files": [
         {
@@ -796,16 +2829,16 @@
         },
         {
           "name": "crystallized_memory.jsonl",
-          "size_bytes": 11350732
+          "size_bytes": 15138568
         },
         {
           "name": "memory.py",
-          "size_bytes": 1109
+          "size_bytes": 2913
         }
       ]
     },
     {
-      "dir": "D:\\Post-doc Work\\Ailys\\memory\\__pycache__",
+      "dir": "C:\\Post-doc Work\\Ailys\\memory\\__pycache__",
       "dirs": [],
       "files": [
         {
@@ -822,22 +2855,132 @@
         },
         {
           "name": "memory.cpython-311.pyc",
-          "size_bytes": 3172
+          "size_bytes": 6752
         }
       ]
     },
     {
-      "dir": "D:\\Post-doc Work\\Ailys\\outputs",
+      "dir": "C:\\Post-doc Work\\Ailys\\memory\\exchanges",
+      "dirs": [],
+      "files": [
+        {
+          "name": "20251017T183642Z_74cc4513_queued.json",
+          "size_bytes": 331
+        },
+        {
+          "name": "20251017T183835Z_feca2fc5_queued.json",
+          "size_bytes": 331
+        },
+        {
+          "name": "20251017T183839Z_feca2fc5_preflight.json",
+          "size_bytes": 306
+        },
+        {
+          "name": "20251017T183841Z_6bfa9e05.json",
+          "size_bytes": 5753
+        },
+        {
+          "name": "20251017T183841Z_feca2fc5_denied_or_failed.json",
+          "size_bytes": 222
+        },
+        {
+          "name": "20251017T203359Z_49f9bbe1_queued.json",
+          "size_bytes": 331
+        },
+        {
+          "name": "20251017T220639Z_3d124e0b_enqueue.json",
+          "size_bytes": 209
+        },
+        {
+          "name": "20251017T220639Z_3d124e0b_queued.json",
+          "size_bytes": 331
+        },
+        {
+          "name": "20251017T220645Z_3d124e0b_attempt1_preflight.json",
+          "size_bytes": 342
+        },
+        {
+          "name": "20251017T220728Z_3d124e0b_approval_returned.json",
+          "size_bytes": 248
+        },
+        {
+          "name": "20251017T220728Z_7bc117c2.json",
+          "size_bytes": 5215
+        },
+        {
+          "name": "20251017T224417Z_d2eededa_enqueue.json",
+          "size_bytes": 209
+        },
+        {
+          "name": "20251017T224417Z_d2eededa_queued.json",
+          "size_bytes": 331
+        },
+        {
+          "name": "20251017T224424Z_d2eededa_attempt1_preflight.json",
+          "size_bytes": 342
+        },
+        {
+          "name": "20251017T224451Z_07992c2c.json",
+          "size_bytes": 4753
+        },
+        {
+          "name": "20251017T224451Z_c5b944b0.json",
+          "size_bytes": 5215
+        },
+        {
+          "name": "20251017T224451Z_d2eededa_attempt1_requested.json",
+          "size_bytes": 676
+        },
+        {
+          "name": "20251018T005444Z_4ccb865d_enqueue.json",
+          "size_bytes": 209
+        },
+        {
+          "name": "20251018T005444Z_4ccb865d_queued.json",
+          "size_bytes": 331
+        },
+        {
+          "name": "20251018T005453Z_4ccb865d_attempt1_preflight.json",
+          "size_bytes": 342
+        },
+        {
+          "name": "20251018T005510Z_0a3dd964.json",
+          "size_bytes": 5215
+        },
+        {
+          "name": "20251018T005510Z_4ccb865d_approval_returned.json",
+          "size_bytes": 248
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\outputs",
       "dirs": [
-        "ks_chunks",
-        "ks_prompt_chunks",
-        "ks_viz"
+        "archive_knowledgeSpace",
+        "archive_literatureReview",
+        "ks_viz",
+        "lit_runs"
       ],
       "files": [
         {
           "name": "C2_Lit_Review.xlsx",
           "size_bytes": 428360
         },
+        {
+          "name": "ks_timeline.json",
+          "size_bytes": 3708733
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\outputs\\archive_knowledgeSpace",
+      "dirs": [
+        "ks_chunks",
+        "ks_prompt_chunks",
+        "ks_runs",
+        "ks_viz"
+      ],
+      "files": [
         {
           "name": "ks_changes_all.jsonl",
           "size_bytes": 9485348
@@ -865,7 +3008,7 @@
       ]
     },
     {
-      "dir": "D:\\Post-doc Work\\Ailys\\outputs\\ks_chunks",
+      "dir": "C:\\Post-doc Work\\Ailys\\outputs\\archive_knowledgeSpace\\ks_chunks",
       "dirs": [],
       "files": [
         {
@@ -903,7 +3046,7 @@
       ]
     },
     {
-      "dir": "D:\\Post-doc Work\\Ailys\\outputs\\ks_prompt_chunks",
+      "dir": "C:\\Post-doc Work\\Ailys\\outputs\\archive_knowledgeSpace\\ks_prompt_chunks",
       "dirs": [],
       "files": [
         {
@@ -941,7 +3084,14 @@
       ]
     },
     {
-      "dir": "D:\\Post-doc Work\\Ailys\\outputs\\ks_viz",
+      "dir": "C:\\Post-doc Work\\Ailys\\outputs\\archive_knowledgeSpace\\ks_runs",
+      "dirs": [
+        "Ailys"
+      ],
+      "files": []
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\outputs\\archive_knowledgeSpace\\ks_viz",
       "dirs": [
         "units"
       ],
@@ -956,20 +3106,58 @@
         },
         {
           "name": "global_timeline_logs.html",
-          "size_bytes": 1468881
+          "size_bytes": 2774059
         },
         {
           "name": "global_timeline_logs.png",
-          "size_bytes": 2188176
+          "size_bytes": 2196911
         },
         {
           "name": "global_timeline_logs_all.html",
-          "size_bytes": 4955895
+          "size_bytes": 6559213
         }
       ]
     },
     {
-      "dir": "D:\\Post-doc Work\\Ailys\\outputs\\ks_viz\\units",
+      "dir": "C:\\Post-doc Work\\Ailys\\outputs\\archive_literatureReview",
+      "dirs": [],
+      "files": [
+        {
+          "name": "C2_Lit_Review.xlsx",
+          "size_bytes": 428360
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\outputs\\ks_viz",
+      "dirs": [
+        "units"
+      ],
+      "files": [
+        {
+          "name": "global_timeline_local.html",
+          "size_bytes": 3159973
+        },
+        {
+          "name": "global_timeline_local.png",
+          "size_bytes": 2596786
+        },
+        {
+          "name": "global_timeline_logs.html",
+          "size_bytes": 3304070
+        },
+        {
+          "name": "global_timeline_logs.png",
+          "size_bytes": 2194892
+        },
+        {
+          "name": "global_timeline_logs_all.html",
+          "size_bytes": 7089224
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\outputs\\ks_viz\\units",
       "dirs": [
         "local",
         "logs"
@@ -977,14 +3165,47 @@
       "files": []
     },
     {
-      "dir": "D:\\Post-doc Work\\Ailys\\reference_docs",
+      "dir": "C:\\Post-doc Work\\Ailys\\outputs\\lit_runs",
+      "dirs": [
+        "2025-10-14T21-06-47Z",
+        "2025-10-14T21-49-25Z",
+        "2025-10-16T15-04-07Z"
+      ],
+      "files": []
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\outputs\\lit_runs\\2025-10-14T21-06-47Z",
+      "dirs": [
+        "csv",
+        "meta"
+      ],
+      "files": []
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\outputs\\lit_runs\\2025-10-14T21-49-25Z",
+      "dirs": [
+        "csv",
+        "meta"
+      ],
+      "files": []
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\outputs\\lit_runs\\2025-10-16T15-04-07Z",
+      "dirs": [
+        "csv",
+        "meta"
+      ],
+      "files": []
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\reference_docs",
       "dirs": [
         "processed_reviews"
       ],
       "files": []
     },
     {
-      "dir": "D:\\Post-doc Work\\Ailys\\reference_docs\\processed_reviews",
+      "dir": "C:\\Post-doc Work\\Ailys\\reference_docs\\processed_reviews",
       "dirs": [],
       "files": [
         {
@@ -994,7 +3215,25 @@
       ]
     },
     {
-      "dir": "D:\\Post-doc Work\\Ailys\\tasks",
+      "dir": "C:\\Post-doc Work\\Ailys\\scripts",
+      "dirs": [],
+      "files": [
+        {
+          "name": "context_pack.py",
+          "size_bytes": 4784
+        },
+        {
+          "name": "pack.bat.py",
+          "size_bytes": 147
+        },
+        {
+          "name": "pack.ps1.py",
+          "size_bytes": 189
+        }
+      ]
+    },
+    {
+      "dir": "C:\\Post-doc Work\\Ailys\\tasks",
       "dirs": [
         "__pycache__",
         "data"
@@ -1005,8 +3244,16 @@
           "size_bytes": 0
         },
         {
+          "name": "approvals_selftest.py",
+          "size_bytes": 683
+        },
+        {
+          "name": "chat.py",
+          "size_bytes": 2404
+        },
+        {
           "name": "compute_metrics.py",
-          "size_bytes": 3802
+          "size_bytes": 5660
         },
         {
           "name": "export_changes.py",
@@ -1014,7 +3261,7 @@
         },
         {
           "name": "export_timeline_csv.py",
-          "size_bytes": 2264
+          "size_bytes": 3848
         },
         {
           "name": "generate_timeline.py",
@@ -1041,13 +3288,21 @@
           "size_bytes": 367
         },
         {
+          "name": "lit_search_collect.py",
+          "size_bytes": 3343
+        },
+        {
+          "name": "lit_search_keywords.py",
+          "size_bytes": 15752
+        },
+        {
           "name": "literature_review.py",
           "size_bytes": 7106
         }
       ]
     },
     {
-      "dir": "D:\\Post-doc Work\\Ailys\\tasks\\__pycache__",
+      "dir": "C:\\Post-doc Work\\Ailys\\tasks\\__pycache__",
       "dirs": [],
       "files": [
         {
@@ -1059,16 +3314,24 @@
           "size_bytes": 149
         },
         {
+          "name": "approvals_selftest.cpython-311.pyc",
+          "size_bytes": 1570
+        },
+        {
+          "name": "chat.cpython-311.pyc",
+          "size_bytes": 4313
+        },
+        {
           "name": "compute_metrics.cpython-311.pyc",
-          "size_bytes": 5698
+          "size_bytes": 8414
         },
         {
           "name": "export_changes.cpython-311.pyc",
-          "size_bytes": 1001
+          "size_bytes": 2455
         },
         {
           "name": "export_timeline_csv.cpython-311.pyc",
-          "size_bytes": 4083
+          "size_bytes": 6169
         },
         {
           "name": "generate_timeline.cpython-310.pyc",
@@ -1095,12 +3358,20 @@
           "size_bytes": 858
         },
         {
+          "name": "ks_diagnose.cpython-311.pyc",
+          "size_bytes": 2442
+        },
+        {
           "name": "ks_fix_changelog_ts.cpython-310.pyc",
           "size_bytes": 1277
         },
         {
           "name": "ks_fix_changelog_ts.cpython-311.pyc",
           "size_bytes": 1947
+        },
+        {
+          "name": "lit_search_keywords.cpython-311.pyc",
+          "size_bytes": 19515
         },
         {
           "name": "literature_review.cpython-310.pyc",
@@ -1113,21 +3384,21 @@
       ]
     },
     {
-      "dir": "D:\\Post-doc Work\\Ailys\\tasks\\data",
+      "dir": "C:\\Post-doc Work\\Ailys\\tasks\\data",
       "dirs": [
         "knowledge_space"
       ],
       "files": []
     },
     {
-      "dir": "D:\\Post-doc Work\\Ailys\\tasks\\data\\knowledge_space",
+      "dir": "C:\\Post-doc Work\\Ailys\\tasks\\data\\knowledge_space",
       "dirs": [
         "snapshots"
       ],
       "files": []
     },
     {
-      "dir": "D:\\Post-doc Work\\Ailys\\venv",
+      "dir": "C:\\Post-doc Work\\Ailys\\venv",
       "dirs": [
         "Lib",
         "Scripts",
@@ -1140,34 +3411,30 @@
         },
         {
           "name": "pyvenv.cfg",
-          "size_bytes": 410
+          "size_bytes": 298
         }
       ]
     },
     {
-      "dir": "D:\\Post-doc Work\\Ailys\\venv\\Lib",
+      "dir": "C:\\Post-doc Work\\Ailys\\venv\\Lib",
       "dirs": [
         "site-packages"
       ],
       "files": []
     },
     {
-      "dir": "D:\\Post-doc Work\\Ailys\\venv\\Lib\\site-packages",
+      "dir": "C:\\Post-doc Work\\Ailys\\venv\\Lib\\site-packages",
       "dirs": [
         "PIL",
         "PySide6",
-        "PySide6-6.9.0.dist-info",
-        "PySide6_Addons-6.9.0.dist-info",
-        "PySide6_Essentials-6.9.0.dist-info",
         "__pycache__",
         "_distutils_hack",
-        "_plotly_utils",
         "annotated_types",
         "annotated_types-0.7.0.dist-info",
         "anyio",
-        "anyio-4.9.0.dist-info",
+        "anyio-4.11.0.dist-info",
         "certifi",
-        "certifi-2025.4.26.dist-info",
+        "certifi-2025.10.5.dist-info",
         "colorama",
         "colorama-0.4.6.dist-info",
         "contourpy",
@@ -1182,7 +3449,7 @@
         "et_xmlfile-2.0.0.dist-info",
         "fitz",
         "fontTools",
-        "fonttools-4.59.2.dist-info",
+        "fonttools-4.60.1.dist-info",
         "h11",
         "h11-0.16.0.dist-info",
         "httpcore",
@@ -1192,78 +3459,107 @@
         "idna",
         "idna-3.10.dist-info",
         "jiter",
-        "jiter-0.9.0.dist-info",
+        "jiter-0.11.0.dist-info",
         "kiwisolver",
         "kiwisolver-1.4.9.dist-info",
         "matplotlib",
-        "matplotlib-3.10.6.dist-info",
+        "matplotlib-3.10.7.dist-info",
         "mpl_toolkits",
-        "narwhals",
-        "narwhals-2.5.0.dist-info",
         "numpy",
-        "numpy-2.2.5.dist-info",
+        "numpy-2.3.3.dist-info",
         "numpy.libs",
         "openai",
-        "openai-1.78.0.dist-info",
+        "openai-2.3.0.dist-info",
         "openpyxl",
         "openpyxl-3.1.5.dist-info",
         "packaging",
         "packaging-25.0.dist-info",
         "pandas",
-        "pandas-2.2.3.dist-info",
+        "pandas-2.3.3.dist-info",
         "pandas.libs",
-        "pillow-11.2.1.dist-info",
+        "pillow-11.3.0.dist-info",
+        "pillow_heif",
+        "pillow_heif-1.1.1.dist-info",
         "pip",
-        "pip-25.1.1.dist-info",
+        "pip-21.3.1.dist-info",
         "pkg_resources",
-        "plotly",
-        "plotly-6.3.0.dist-info",
         "pydantic",
-        "pydantic-2.11.4.dist-info",
+        "pydantic-2.12.0.dist-info",
         "pydantic_core",
-        "pydantic_core-2.33.2.dist-info",
+        "pydantic_core-2.41.1.dist-info",
         "pymupdf",
-        "pymupdf-1.25.5.dist-info",
+        "pymupdf-1.26.5.dist-info",
         "pyparsing",
-        "pyparsing-3.2.4.dist-info",
+        "pyparsing-3.2.5.dist-info",
+        "pyside6-6.10.0.dist-info",
+        "pyside6_addons-6.10.0.dist-info",
+        "pyside6_essentials-6.10.0.dist-info",
         "pytesseract",
         "pytesseract-0.3.13.dist-info",
         "python_dateutil-2.9.0.post0.dist-info",
-        "python_dotenv-1.1.0.dist-info",
+        "python_dotenv-1.1.1.dist-info",
         "pytz",
         "pytz-2025.2.dist-info",
         "setuptools",
-        "setuptools-80.1.0.dist-info",
+        "setuptools-60.2.0.dist-info",
         "shiboken6",
-        "shiboken6-6.9.0.dist-info",
+        "shiboken6-6.10.0.dist-info",
         "six-1.17.0.dist-info",
         "sniffio",
         "sniffio-1.3.1.dist-info",
         "tqdm",
         "tqdm-4.67.1.dist-info",
-        "typing_extensions-4.13.2.dist-info",
+        "typing_extensions-4.15.0.dist-info",
         "typing_inspection",
-        "typing_inspection-0.4.0.dist-info",
+        "typing_inspection-0.4.2.dist-info",
         "tzdata",
         "tzdata-2025.2.dist-info",
         "wheel",
-        "wheel-0.45.1.dist-info"
+        "wheel-0.37.1.dist-info"
       ],
       "files": [
+        {
+          "name": "_pillow_heif.cp311-win_amd64.pyd",
+          "size_bytes": 49152
+        },
         {
           "name": "_virtualenv.pth",
           "size_bytes": 18
         },
         {
           "name": "_virtualenv.py",
-          "size_bytes": 5770
+          "size_bytes": 5792
         },
         {
           "name": "distutils-precedence.pth",
           "size_bytes": 151
         },
         {
-          "name": "numpy-2.2.5-cp311-cp311-win_amd64.whl",
+          "name": "libde265-0-dbf9d2515cd00e4e292b013384bc1e9a.dll",
+          "size_bytes": 466944
+        },
+        {
+          "name": "libgcc_s_seh-1-a84f7fcd11e7ef90fc2b66c0c614027d.dll",
+          "size_bytes": 148480
+        },
+        {
+          "name": "libheif-15f7d89fa46fe9ee8f702ba3231ab48c.dll",
+          "size_bytes": 1626624
+        },
+        {
+          "name": "libstdc++-6-5c53f6625ef913b64e46672820aa2061.dll",
+          "size_bytes": 2455040
+        },
+        {
+          "name": "libwinpthread-1-f0c48bcf1f1f0a65b4f99406f56db734.dll",
+          "size_bytes": 64403
+        },
+        {
+          "name": "libx265-215-abfafd9e2d83b65890b69cb1a44dc7ae.dll",
+          "size_bytes": 20826112
+        },
+        {
+          "name": "pip-21.3.1.virtualenv",
           "size_bytes": 0
         },
         {
@@ -1271,34 +3567,42 @@
           "size_bytes": 110
         },
         {
+          "name": "setuptools-60.2.0.virtualenv",
+          "size_bytes": 0
+        },
+        {
           "name": "six.py",
           "size_bytes": 34703
         },
         {
           "name": "typing_extensions.py",
-          "size_bytes": 172654
+          "size_bytes": 160429
+        },
+        {
+          "name": "wheel-0.37.1.virtualenv",
+          "size_bytes": 0
         }
       ]
     },
     {
-      "dir": "D:\\Post-doc Work\\Ailys\\venv\\Scripts",
+      "dir": "C:\\Post-doc Work\\Ailys\\venv\\Scripts",
       "dirs": [],
       "files": [
         {
           "name": "activate",
-          "size_bytes": 2162
+          "size_bytes": 2150
         },
         {
           "name": "activate.bat",
-          "size_bytes": 1015
+          "size_bytes": 990
         },
         {
           "name": "activate.fish",
-          "size_bytes": 3039
+          "size_bytes": 3027
         },
         {
           "name": "activate.nu",
-          "size_bytes": 2597
+          "size_bytes": 1299
         },
         {
           "name": "activate.ps1",
@@ -1306,59 +3610,59 @@
         },
         {
           "name": "activate_this.py",
-          "size_bytes": 1169
+          "size_bytes": 1193
         },
         {
           "name": "deactivate.bat",
-          "size_bytes": 511
+          "size_bytes": 510
         },
         {
           "name": "deactivate.nu",
-          "size_bytes": 682
+          "size_bytes": 333
         },
         {
           "name": "distro.exe",
-          "size_bytes": 108408
+          "size_bytes": 106350
         },
         {
           "name": "dotenv.exe",
-          "size_bytes": 108408
+          "size_bytes": 106350
         },
         {
           "name": "f2py.exe",
-          "size_bytes": 108400
+          "size_bytes": 106354
         },
         {
           "name": "fonttools.exe",
-          "size_bytes": 108401
+          "size_bytes": 106355
         },
         {
           "name": "httpx.exe",
-          "size_bytes": 108400
+          "size_bytes": 106342
         },
         {
           "name": "numpy-config.exe",
-          "size_bytes": 108400
+          "size_bytes": 106354
         },
         {
           "name": "openai.exe",
-          "size_bytes": 108393
+          "size_bytes": 106347
+        },
+        {
+          "name": "pip-3.11.exe",
+          "size_bytes": 106871
         },
         {
           "name": "pip.exe",
-          "size_bytes": 108405
+          "size_bytes": 106871
         },
         {
           "name": "pip3.11.exe",
-          "size_bytes": 108405
+          "size_bytes": 106871
         },
         {
           "name": "pip3.exe",
-          "size_bytes": 108405
-        },
-        {
-          "name": "plotly_get_chrome.exe",
-          "size_bytes": 108427
+          "size_bytes": 106871
         },
         {
           "name": "pydoc.bat",
@@ -1366,151 +3670,155 @@
         },
         {
           "name": "pyftmerge.exe",
-          "size_bytes": 108398
+          "size_bytes": 106352
         },
         {
           "name": "pyftsubset.exe",
-          "size_bytes": 108399
+          "size_bytes": 106353
         },
         {
           "name": "pymupdf.exe",
-          "size_bytes": 108411
+          "size_bytes": 106353
         },
         {
           "name": "pyside6-assistant.exe",
-          "size_bytes": 108432
+          "size_bytes": 106374
         },
         {
           "name": "pyside6-balsam.exe",
-          "size_bytes": 108426
+          "size_bytes": 106368
         },
         {
           "name": "pyside6-balsamui.exe",
-          "size_bytes": 108430
+          "size_bytes": 106372
         },
         {
           "name": "pyside6-deploy.exe",
-          "size_bytes": 108426
+          "size_bytes": 106368
         },
         {
           "name": "pyside6-designer.exe",
-          "size_bytes": 108430
+          "size_bytes": 106372
         },
         {
           "name": "pyside6-genpyi.exe",
-          "size_bytes": 108426
+          "size_bytes": 106368
         },
         {
           "name": "pyside6-linguist.exe",
-          "size_bytes": 108430
+          "size_bytes": 106372
         },
         {
           "name": "pyside6-lrelease.exe",
-          "size_bytes": 108430
+          "size_bytes": 106372
         },
         {
           "name": "pyside6-lupdate.exe",
-          "size_bytes": 108428
+          "size_bytes": 106370
         },
         {
           "name": "pyside6-metaobjectdump.exe",
-          "size_bytes": 108442
+          "size_bytes": 106384
         },
         {
           "name": "pyside6-project.exe",
-          "size_bytes": 108428
+          "size_bytes": 106370
         },
         {
           "name": "pyside6-qml.exe",
-          "size_bytes": 108420
+          "size_bytes": 106362
         },
         {
           "name": "pyside6-qmlcachegen.exe",
-          "size_bytes": 108436
+          "size_bytes": 106378
         },
         {
           "name": "pyside6-qmlformat.exe",
-          "size_bytes": 108432
+          "size_bytes": 106374
         },
         {
           "name": "pyside6-qmlimportscanner.exe",
-          "size_bytes": 108446
+          "size_bytes": 106388
         },
         {
           "name": "pyside6-qmllint.exe",
-          "size_bytes": 108428
+          "size_bytes": 106370
         },
         {
           "name": "pyside6-qmlls.exe",
-          "size_bytes": 108424
+          "size_bytes": 106366
         },
         {
           "name": "pyside6-qmltyperegistrar.exe",
-          "size_bytes": 108446
+          "size_bytes": 106388
         },
         {
           "name": "pyside6-qsb.exe",
-          "size_bytes": 108420
+          "size_bytes": 106362
         },
         {
           "name": "pyside6-qtpy2cpp.exe",
-          "size_bytes": 108430
+          "size_bytes": 106372
         },
         {
           "name": "pyside6-rcc.exe",
-          "size_bytes": 108420
+          "size_bytes": 106362
         },
         {
           "name": "pyside6-svgtoqml.exe",
-          "size_bytes": 108430
+          "size_bytes": 106372
         },
         {
           "name": "pyside6-uic.exe",
-          "size_bytes": 108420
+          "size_bytes": 106362
         },
         {
           "name": "pytesseract.exe",
-          "size_bytes": 108406
+          "size_bytes": 106360
         },
         {
           "name": "python.exe",
-          "size_bytes": 270616
+          "size_bytes": 274712
         },
         {
           "name": "pythonw.exe",
-          "size_bytes": 259344
+          "size_bytes": 263448
         },
         {
           "name": "tqdm.exe",
-          "size_bytes": 108403
+          "size_bytes": 106345
         },
         {
           "name": "ttx.exe",
-          "size_bytes": 108396
+          "size_bytes": 106350
+        },
+        {
+          "name": "wheel-3.11.exe",
+          "size_bytes": 106858
         },
         {
           "name": "wheel.exe",
-          "size_bytes": 108406
+          "size_bytes": 106858
+        },
+        {
+          "name": "wheel3.11.exe",
+          "size_bytes": 106858
+        },
+        {
+          "name": "wheel3.exe",
+          "size_bytes": 106858
         }
       ]
     },
     {
-      "dir": "D:\\Post-doc Work\\Ailys\\venv\\share",
+      "dir": "C:\\Post-doc Work\\Ailys\\venv\\share",
       "dirs": [
-        "jupyter",
         "man"
       ],
       "files": []
     },
     {
-      "dir": "D:\\Post-doc Work\\Ailys\\venv\\share\\jupyter",
-      "dirs": [
-        "labextensions"
-      ],
-      "files": []
-    },
-    {
-      "dir": "D:\\Post-doc Work\\Ailys\\venv\\share\\man",
+      "dir": "C:\\Post-doc Work\\Ailys\\venv\\share\\man",
       "dirs": [
         "man1"
       ],
@@ -1530,10 +3838,10 @@
     "pyproject_toml": {
       "build-system": {
         "requires": [
-          "meson-python==0.13.1",
-          "meson==1.2.1",
+          "meson-python>=0.13.1",
+          "meson>=1.2.1,<2",
           "wheel",
-          "Cython~=3.0.5",
+          "Cython<4.0.0a0",
           "numpy>=2.0",
           "versioneer[toml]"
         ],
@@ -1578,6 +3886,8 @@
           "Programming Language :: Python :: 3.10",
           "Programming Language :: Python :: 3.11",
           "Programming Language :: Python :: 3.12",
+          "Programming Language :: Python :: 3.13",
+          "Programming Language :: Python :: 3.14",
           "Topic :: Scientific/Engineering"
         ],
         "urls": {
@@ -1753,17 +4063,19 @@
           }
         },
         "cibuildwheel": {
-          "skip": "cp36-* cp37-* cp38-* pp* *_i686 *_ppc64le *_s390x",
+          "skip": "cp38-* *_i686 *_ppc64le *_s390x",
           "build-verbosity": "3",
           "environment": {
             "LDFLAGS": "-Wl,--strip-all"
           },
           "test-requires": "hypothesis>=6.46.1 pytest>=7.3.2 pytest-xdist>=2.2.0 pytz<2024.2",
           "test-command": "  PANDAS_CI='1' python -c 'import pandas as pd; pd.test(extra_args=[\"-m not clipboard and not single_cpu and not slow and not network and not db\", \"-n 2\", \"--no-strict-data-files\"]); pd.test(extra_args=[\"-m not clipboard and single_cpu and not slow and not network and not db\", \"--no-strict-data-files\"]);' ",
-          "free-threaded-support": true,
+          "enable": [
+            "cpython-freethreading"
+          ],
           "before-build": "PACKAGE_DIR={package} bash {package}/scripts/cibw_before_build.sh",
           "windows": {
-            "before-build": "pip install delvewheel && bash {package}/scripts/cibw_before_build.sh",
+            "before-build": "pip install delvewheel",
             "repair-wheel-command": "delvewheel repair -w {dest_dir} {wheel}"
           },
           "overrides": [
@@ -1988,7 +4300,9 @@
               "unnecessary-lambda",
               "unused-argument",
               "unused-variable",
-              "using-constant-test"
+              "using-constant-test",
+              "consider-using-in",
+              "simplifiable-if-expression"
             ]
           }
         },
@@ -2026,7 +4340,8 @@
               "ignore:distutils Version classes are deprecated:DeprecationWarning:numexpr",
               "ignore:distutils Version classes are deprecated:DeprecationWarning:fastparquet",
               "ignore:distutils Version classes are deprecated:DeprecationWarning:fsspec",
-              "ignore:.*In the future `np.long` will be defined as.*:FutureWarning"
+              "ignore:.*In the future `np.long` will be defined as.*:FutureWarning",
+              "ignore:.*align should be passed:"
             ],
             "junit_family": "xunit2",
             "markers": [
@@ -2347,6 +4662,15 @@
   },
   "entry_points": [
     {
+      "path": "ailys_snapshot.py",
+      "has_main_guard": true,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": [
+        "tkinter"
+      ]
+    },
+    {
       "path": "memory_loader.py",
       "has_main_guard": true,
       "uses_argparse": false,
@@ -2361,13 +4685,11 @@
       "gui_hits": []
     },
     {
-      "path": "ailys_snapshot.py",
+      "path": "scripts\\context_pack.py",
       "has_main_guard": true,
-      "uses_argparse": true,
+      "uses_argparse": false,
       "uses_click": false,
-      "gui_hits": [
-        "tkinter"
-      ]
+      "gui_hits": []
     },
     {
       "path": "venv\\Lib\\site-packages\\anyio\\to_process.py",
@@ -2447,10 +4769,605 @@
       "gui_hits": []
     },
     {
+      "path": "venv\\Lib\\site-packages\\fontTools\\afmLib.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\help.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\tfmLib.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\ttx.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\__main__.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\cffLib\\CFF2ToCFF.py",
+      "has_main_guard": true,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\cffLib\\CFFToCFF2.py",
+      "has_main_guard": true,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\cffLib\\specializer.py",
+      "has_main_guard": true,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\cffLib\\width.py",
+      "has_main_guard": true,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\colorLib\\unbuilder.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\cu2qu\\benchmark.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\cu2qu\\cli.py",
+      "has_main_guard": false,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\cu2qu\\__main__.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\designspaceLib\\__init__.py",
+      "has_main_guard": false,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\designspaceLib\\__main__.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\feaLib\\__main__.py",
+      "has_main_guard": true,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\merge\\__init__.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\merge\\__main__.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\misc\\arrayTools.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\misc\\bezierTools.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\misc\\classifyTools.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\misc\\eexec.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\misc\\filenames.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\misc\\loggingTools.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\misc\\sstruct.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\misc\\symfont.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\misc\\textTools.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\misc\\timeTools.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\misc\\transform.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\mtiLib\\__init__.py",
+      "has_main_guard": true,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\mtiLib\\__main__.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\otlLib\\optimize\\__init__.py",
+      "has_main_guard": true,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\otlLib\\optimize\\__main__.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\pens\\basePen.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\pens\\momentsPen.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\pens\\recordingPen.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\pens\\reportLabPen.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\pens\\statisticsPen.py",
+      "has_main_guard": true,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\pens\\svgPathPen.py",
+      "has_main_guard": true,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\pens\\teePen.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\pens\\transformPen.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\qu2cu\\benchmark.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\qu2cu\\cli.py",
+      "has_main_guard": false,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\qu2cu\\qu2cu.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\qu2cu\\__main__.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\subset\\__main__.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\ttLib\\removeOverlaps.py",
+      "has_main_guard": true,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\ttLib\\scaleUpem.py",
+      "has_main_guard": true,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\ttLib\\sfnt.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\ttLib\\woff2.py",
+      "has_main_guard": true,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\ttLib\\__main__.py",
+      "has_main_guard": true,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\ttLib\\tables\\O_S_2f_2.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\ttLib\\tables\\ttProgram.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\ttLib\\tables\\_f_p_g_m.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\ttLib\\tables\\_g_l_y_f.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\ttLib\\tables\\__init__.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\ufoLib\\converters.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\ufoLib\\filenames.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\ufoLib\\glifLib.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\ufoLib\\kerning.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\ufoLib\\utils.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\ufoLib\\validators.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\ufoLib\\__init__.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\varLib\\avarPlanner.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\varLib\\featureVars.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\varLib\\hvar.py",
+      "has_main_guard": true,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\varLib\\interpolatable.py",
+      "has_main_guard": true,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\varLib\\interpolate_layout.py",
+      "has_main_guard": true,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\varLib\\models.py",
+      "has_main_guard": true,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\varLib\\mutator.py",
+      "has_main_guard": true,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\varLib\\plot.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\varLib\\varStore.py",
+      "has_main_guard": true,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\varLib\\__init__.py",
+      "has_main_guard": true,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\varLib\\__main__.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\varLib\\avar\\build.py",
+      "has_main_guard": true,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\varLib\\avar\\map.py",
+      "has_main_guard": true,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\varLib\\avar\\plan.py",
+      "has_main_guard": true,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\varLib\\avar\\unbuild.py",
+      "has_main_guard": true,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\varLib\\avar\\__main__.py",
+      "has_main_guard": true,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\varLib\\instancer\\__init__.py",
+      "has_main_guard": false,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\varLib\\instancer\\__main__.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\voltLib\\voltToFea.py",
+      "has_main_guard": true,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\fontTools\\voltLib\\__main__.py",
+      "has_main_guard": true,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
       "path": "venv\\Lib\\site-packages\\httpx\\_main.py",
       "has_main_guard": false,
       "uses_argparse": false,
       "uses_click": true,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\matplotlib\\dviread.py",
+      "has_main_guard": true,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\matplotlib\\backends\\qt_editor\\_formlayout.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
       "gui_hits": []
     },
     {
@@ -2678,13 +5595,6 @@
       "gui_hits": []
     },
     {
-      "path": "venv\\Lib\\site-packages\\numpy\\ma\\timer_comparison.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
       "path": "venv\\Lib\\site-packages\\numpy\\testing\\print_coercion_tables.py",
       "has_main_guard": true,
       "uses_argparse": false,
@@ -2776,6 +5686,20 @@
       "gui_hits": []
     },
     {
+      "path": "venv\\Lib\\site-packages\\openai\\cli\\_api\\fine_tuning\\jobs.py",
+      "has_main_guard": false,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\openai\\cli\\_api\\fine_tuning\\__init__.py",
+      "has_main_guard": false,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
       "path": "venv\\Lib\\site-packages\\openai\\cli\\_tools\\fine_tunes.py",
       "has_main_guard": false,
       "uses_argparse": true,
@@ -2846,6 +5770,20 @@
       "gui_hits": []
     },
     {
+      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\distro.py",
+      "has_main_guard": true,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\pyparsing.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
       "path": "venv\\Lib\\site-packages\\pip\\_vendor\\cachecontrol\\_cmd.py",
       "has_main_guard": true,
       "uses_argparse": true,
@@ -2860,21 +5798,7 @@
       "gui_hits": []
     },
     {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\dependency_groups\\_lint_dependency_groups.py",
-      "has_main_guard": true,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\dependency_groups\\_pip_wrapper.py",
-      "has_main_guard": true,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\dependency_groups\\__main__.py",
+      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\chardet\\cli\\chardetect.py",
       "has_main_guard": true,
       "uses_argparse": true,
       "uses_click": false,
@@ -2888,14 +5812,7 @@
       "gui_hits": []
     },
     {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\distro\\distro.py",
-      "has_main_guard": true,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\distro\\__main__.py",
+      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\distlib\\_backport\\sysconfig.py",
       "has_main_guard": true,
       "uses_argparse": false,
       "uses_click": false,
@@ -2909,21 +5826,35 @@
       "gui_hits": []
     },
     {
+      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\pep517\\build.py",
+      "has_main_guard": true,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\pep517\\check.py",
+      "has_main_guard": true,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\pep517\\meta.py",
+      "has_main_guard": true,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\pep517\\in_process\\_in_process.py",
+      "has_main_guard": true,
+      "uses_argparse": false,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
       "path": "venv\\Lib\\site-packages\\pip\\_vendor\\platformdirs\\__main__.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\pygments\\unistring.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\pyproject_hooks\\_in_process\\_in_process.py",
       "has_main_guard": true,
       "uses_argparse": false,
       "uses_click": false,
@@ -2944,315 +5875,28 @@
       "gui_hits": []
     },
     {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\abc.py",
+      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\webencodings\\mklabels.py",
       "has_main_guard": true,
       "uses_argparse": false,
       "uses_click": false,
       "gui_hits": []
     },
     {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\align.py",
+      "path": "venv\\Lib\\site-packages\\pkg_resources\\_vendor\\appdirs.py",
       "has_main_guard": true,
       "uses_argparse": false,
       "uses_click": false,
       "gui_hits": []
     },
     {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\box.py",
+      "path": "venv\\Lib\\site-packages\\pkg_resources\\_vendor\\pyparsing.py",
       "has_main_guard": true,
       "uses_argparse": false,
       "uses_click": false,
       "gui_hits": []
     },
     {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\cells.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\color.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\columns.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\console.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\control.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\default_styles.py",
-      "has_main_guard": true,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\diagnose.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\emoji.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\highlighter.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\json.py",
-      "has_main_guard": true,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\layout.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\live.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\logging.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\markup.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\padding.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\pager.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\palette.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\panel.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\pretty.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\progress.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\progress_bar.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\prompt.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\repr.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\rule.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\scope.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\segment.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\spinner.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\status.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\styled.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\syntax.py",
-      "has_main_guard": true,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\table.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\text.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\theme.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\traceback.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\tree.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\_log_render.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\_ratio.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\_win32_console.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\_windows.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\_wrap.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\__init__.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pip\\_vendor\\rich\\__main__.py",
+      "path": "venv\\Lib\\site-packages\\pkg_resources\\_vendor\\packaging\\_musllinux.py",
       "has_main_guard": true,
       "uses_argparse": false,
       "uses_click": false,
@@ -3260,6 +5904,13 @@
     },
     {
       "path": "venv\\Lib\\site-packages\\pymupdf\\__main__.py",
+      "has_main_guard": true,
+      "uses_argparse": true,
+      "uses_click": false,
+      "gui_hits": []
+    },
+    {
+      "path": "venv\\Lib\\site-packages\\pyparsing\\tools\\cvt_pyparsing_pep8_names.py",
       "has_main_guard": true,
       "uses_argparse": true,
       "uses_click": false,
@@ -3388,13 +6039,6 @@
       "gui_hits": []
     },
     {
-      "path": "venv\\Lib\\site-packages\\setuptools\\tests\\config\\downloads\\preload.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
       "path": "venv\\Lib\\site-packages\\setuptools\\_distutils\\fancy_getopt.py",
       "has_main_guard": true,
       "uses_argparse": false,
@@ -3402,35 +6046,7 @@
       "gui_hits": []
     },
     {
-      "path": "venv\\Lib\\site-packages\\setuptools\\_distutils\\tests\\test_core.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\setuptools\\_vendor\\autocommand\\autoparse.py",
-      "has_main_guard": false,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\setuptools\\_vendor\\backports\\tarfile\\__init__.py",
-      "has_main_guard": true,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\setuptools\\_vendor\\backports\\tarfile\\__main__.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\setuptools\\_vendor\\importlib_metadata\\diagnose.py",
+      "path": "venv\\Lib\\site-packages\\setuptools\\_vendor\\pyparsing.py",
       "has_main_guard": true,
       "uses_argparse": false,
       "uses_click": false,
@@ -3438,34 +6054,6 @@
     },
     {
       "path": "venv\\Lib\\site-packages\\setuptools\\_vendor\\packaging\\_musllinux.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\setuptools\\_vendor\\platformdirs\\__main__.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\setuptools\\_vendor\\wheel\\__main__.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\setuptools\\_vendor\\wheel\\cli\\__init__.py",
-      "has_main_guard": false,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\setuptools\\_vendor\\wheel\\vendored\\packaging\\_musllinux.py",
       "has_main_guard": true,
       "uses_argparse": false,
       "uses_click": false,
@@ -3498,598 +6086,28 @@
       "uses_argparse": true,
       "uses_click": false,
       "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\wheel\\vendored\\packaging\\_musllinux.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\pyparsing\\tools\\cvt_pyparsing_pep8_names.py",
-      "has_main_guard": true,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\__main__.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\afmLib.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\help.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\tfmLib.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\ttx.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\cffLib\\CFF2ToCFF.py",
-      "has_main_guard": true,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\cffLib\\CFFToCFF2.py",
-      "has_main_guard": true,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\cffLib\\specializer.py",
-      "has_main_guard": true,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\cffLib\\width.py",
-      "has_main_guard": true,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\colorLib\\unbuilder.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\cu2qu\\__main__.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\cu2qu\\benchmark.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\cu2qu\\cli.py",
-      "has_main_guard": false,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\designspaceLib\\__init__.py",
-      "has_main_guard": false,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\designspaceLib\\__main__.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\feaLib\\__main__.py",
-      "has_main_guard": true,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\merge\\__init__.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\merge\\__main__.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\misc\\arrayTools.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\misc\\bezierTools.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\misc\\classifyTools.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\misc\\eexec.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\misc\\filenames.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\misc\\loggingTools.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\misc\\sstruct.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\misc\\symfont.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\misc\\textTools.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\misc\\timeTools.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\misc\\transform.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\mtiLib\\__init__.py",
-      "has_main_guard": true,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\mtiLib\\__main__.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\otlLib\\optimize\\__init__.py",
-      "has_main_guard": true,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\otlLib\\optimize\\__main__.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\pens\\basePen.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\pens\\momentsPen.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\pens\\recordingPen.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\pens\\reportLabPen.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\pens\\statisticsPen.py",
-      "has_main_guard": true,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\pens\\svgPathPen.py",
-      "has_main_guard": true,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\pens\\teePen.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\pens\\transformPen.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\qu2cu\\__main__.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\qu2cu\\benchmark.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\qu2cu\\cli.py",
-      "has_main_guard": false,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\qu2cu\\qu2cu.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\subset\\__main__.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\ttLib\\__main__.py",
-      "has_main_guard": true,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\ttLib\\removeOverlaps.py",
-      "has_main_guard": true,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\ttLib\\scaleUpem.py",
-      "has_main_guard": true,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\ttLib\\sfnt.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\ttLib\\woff2.py",
-      "has_main_guard": true,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\ttLib\\tables\\O_S_2f_2.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\ttLib\\tables\\__init__.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\ttLib\\tables\\_f_p_g_m.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\ttLib\\tables\\_g_l_y_f.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\ttLib\\tables\\ttProgram.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\ufoLib\\__init__.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\ufoLib\\converters.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\ufoLib\\filenames.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\ufoLib\\glifLib.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\ufoLib\\kerning.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\ufoLib\\utils.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\ufoLib\\validators.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\varLib\\__init__.py",
-      "has_main_guard": true,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\varLib\\__main__.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\varLib\\avar.py",
-      "has_main_guard": true,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\varLib\\avarPlanner.py",
-      "has_main_guard": true,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\varLib\\featureVars.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\varLib\\hvar.py",
-      "has_main_guard": true,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\varLib\\interpolatable.py",
-      "has_main_guard": true,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\varLib\\interpolate_layout.py",
-      "has_main_guard": true,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\varLib\\models.py",
-      "has_main_guard": true,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\varLib\\mutator.py",
-      "has_main_guard": true,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\varLib\\plot.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\varLib\\varStore.py",
-      "has_main_guard": true,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\varLib\\instancer\\__init__.py",
-      "has_main_guard": false,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\varLib\\instancer\\__main__.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\voltLib\\__main__.py",
-      "has_main_guard": true,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\fontTools\\voltLib\\voltToFea.py",
-      "has_main_guard": true,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\matplotlib\\dviread.py",
-      "has_main_guard": true,
-      "uses_argparse": true,
-      "uses_click": false,
-      "gui_hits": []
-    },
-    {
-      "path": "venv\\Lib\\site-packages\\matplotlib\\backends\\qt_editor\\_formlayout.py",
-      "has_main_guard": true,
-      "uses_argparse": false,
-      "uses_click": false,
-      "gui_hits": []
     }
   ],
   "gui_indicators": {
     "ailys_snapshot.py": [
       "tkinter"
     ],
-    "gui\\main_window_backup.py": [
-      "PySide6"
-    ],
     "gui\\main_window.py": [
       "PySide6"
+    ],
+    "venv\\Lib\\site-packages\\fontTools\\pens\\qtPen.py": [
+      "PyQt5"
+    ],
+    "venv\\Lib\\site-packages\\matplotlib\\backends\\qt_compat.py": [
+      "PyQt5",
+      "PySide6",
+      "PySide2"
+    ],
+    "venv\\Lib\\site-packages\\matplotlib\\backends\\_backend_tk.py": [
+      "tkinter"
+    ],
+    "venv\\Lib\\site-packages\\matplotlib\\tests\\test_backend_tk.py": [
+      "tkinter"
     ],
     "venv\\Lib\\site-packages\\pandas\\io\\clipboard\\__init__.py": [
       "PyQt5"
@@ -4132,32 +6150,61 @@
     ],
     "venv\\Lib\\site-packages\\tqdm\\tk.py": [
       "tkinter"
-    ],
-    "venv\\Lib\\site-packages\\fontTools\\pens\\qtPen.py": [
-      "PyQt5"
-    ],
-    "venv\\Lib\\site-packages\\matplotlib\\backends\\_backend_tk.py": [
-      "tkinter"
-    ],
-    "venv\\Lib\\site-packages\\matplotlib\\backends\\qt_compat.py": [
-      "PyQt5",
-      "PySide6",
-      "PySide2"
-    ],
-    "venv\\Lib\\site-packages\\matplotlib\\tests\\test_backend_tk.py": [
-      "tkinter"
     ]
   },
   "config_files": [
-    "outputs\\ks_changes_compiled.json",
-    "outputs\\ks_prompt_chunks\\prompt_chunk_0001.json",
-    "outputs\\ks_prompt_chunks\\prompt_chunk_0002.json",
-    "outputs\\ks_prompt_chunks\\prompt_chunk_0003.json",
-    "outputs\\ks_prompt_chunks\\prompt_chunk_0004.json",
-    "outputs\\ks_prompt_chunks\\prompt_chunk_0005.json",
-    "outputs\\ks_prompt_chunks\\prompt_chunk_0006.json",
-    "outputs\\ks_prompt_chunks\\prompt_chunk_0007.json",
-    "outputs\\ks_prompt_chunks\\prompt_chunk_0008.json",
+    ".github\\workflows\\context-pack.yml",
+    "memory\\exchanges\\20251017T183642Z_74cc4513_queued.json",
+    "memory\\exchanges\\20251017T183835Z_feca2fc5_queued.json",
+    "memory\\exchanges\\20251017T183839Z_feca2fc5_preflight.json",
+    "memory\\exchanges\\20251017T183841Z_6bfa9e05.json",
+    "memory\\exchanges\\20251017T183841Z_feca2fc5_denied_or_failed.json",
+    "memory\\exchanges\\20251017T203359Z_49f9bbe1_queued.json",
+    "memory\\exchanges\\20251017T220639Z_3d124e0b_enqueue.json",
+    "memory\\exchanges\\20251017T220639Z_3d124e0b_queued.json",
+    "memory\\exchanges\\20251017T220645Z_3d124e0b_attempt1_preflight.json",
+    "memory\\exchanges\\20251017T220728Z_3d124e0b_approval_returned.json",
+    "memory\\exchanges\\20251017T220728Z_7bc117c2.json",
+    "memory\\exchanges\\20251017T224417Z_d2eededa_enqueue.json",
+    "memory\\exchanges\\20251017T224417Z_d2eededa_queued.json",
+    "memory\\exchanges\\20251017T224424Z_d2eededa_attempt1_preflight.json",
+    "memory\\exchanges\\20251017T224451Z_07992c2c.json",
+    "memory\\exchanges\\20251017T224451Z_c5b944b0.json",
+    "memory\\exchanges\\20251017T224451Z_d2eededa_attempt1_requested.json",
+    "memory\\exchanges\\20251018T005444Z_4ccb865d_enqueue.json",
+    "memory\\exchanges\\20251018T005444Z_4ccb865d_queued.json",
+    "memory\\exchanges\\20251018T005453Z_4ccb865d_attempt1_preflight.json",
+    "memory\\exchanges\\20251018T005510Z_0a3dd964.json",
+    "memory\\exchanges\\20251018T005510Z_4ccb865d_approval_returned.json",
+    "outputs\\archive_knowledgeSpace\\ks_changes_compiled.json",
+    "outputs\\archive_knowledgeSpace\\ks_prompt_chunks\\prompt_chunk_0001.json",
+    "outputs\\archive_knowledgeSpace\\ks_prompt_chunks\\prompt_chunk_0002.json",
+    "outputs\\archive_knowledgeSpace\\ks_prompt_chunks\\prompt_chunk_0003.json",
+    "outputs\\archive_knowledgeSpace\\ks_prompt_chunks\\prompt_chunk_0004.json",
+    "outputs\\archive_knowledgeSpace\\ks_prompt_chunks\\prompt_chunk_0005.json",
+    "outputs\\archive_knowledgeSpace\\ks_prompt_chunks\\prompt_chunk_0006.json",
+    "outputs\\archive_knowledgeSpace\\ks_prompt_chunks\\prompt_chunk_0007.json",
+    "outputs\\archive_knowledgeSpace\\ks_prompt_chunks\\prompt_chunk_0008.json",
+    "outputs\\archive_knowledgeSpace\\ks_runs\\Ailys\\2025-09-26_11-32-18_xz4a\\json\\ks_changes_compiled.json",
+    "outputs\\archive_knowledgeSpace\\ks_runs\\Ailys\\2025-09-26_11-32-18_xz4a\\json\\prompt_chunks\\prompt_chunk_0001.json",
+    "outputs\\archive_knowledgeSpace\\ks_runs\\Ailys\\2025-09-26_11-32-18_xz4a\\json\\prompt_chunks\\prompt_chunk_0002.json",
+    "outputs\\archive_knowledgeSpace\\ks_runs\\Ailys\\2025-09-26_11-32-18_xz4a\\json\\prompt_chunks\\prompt_chunk_0003.json",
+    "outputs\\archive_knowledgeSpace\\ks_runs\\Ailys\\2025-09-26_11-32-18_xz4a\\json\\prompt_chunks\\prompt_chunk_0004.json",
+    "outputs\\archive_knowledgeSpace\\ks_runs\\Ailys\\2025-09-26_11-32-18_xz4a\\json\\prompt_chunks\\prompt_chunk_0005.json",
+    "outputs\\archive_knowledgeSpace\\ks_runs\\Ailys\\2025-09-26_11-32-18_xz4a\\meta.json",
+    "outputs\\archive_knowledgeSpace\\ks_runs\\Ailys\\2025-09-26_11-33-01_vcbj\\meta.json",
+    "outputs\\archive_knowledgeSpace\\ks_runs\\Ailys\\2025-09-26_11-33-02_hkmz\\meta.json",
+    "outputs\\archive_knowledgeSpace\\ks_runs\\Ailys\\2025-09-26_19-26-26_abco\\json\\ks_changes_compiled.json",
+    "outputs\\archive_knowledgeSpace\\ks_runs\\Ailys\\2025-09-26_19-26-26_abco\\json\\prompt_chunks\\prompt_chunk_0001.json",
+    "outputs\\archive_knowledgeSpace\\ks_runs\\Ailys\\2025-09-26_19-26-26_abco\\json\\prompt_chunks\\prompt_chunk_0002.json",
+    "outputs\\archive_knowledgeSpace\\ks_runs\\Ailys\\2025-09-26_19-26-26_abco\\json\\prompt_chunks\\prompt_chunk_0003.json",
+    "outputs\\archive_knowledgeSpace\\ks_runs\\Ailys\\2025-09-26_19-26-26_abco\\json\\prompt_chunks\\prompt_chunk_0004.json",
+    "outputs\\archive_knowledgeSpace\\ks_runs\\Ailys\\2025-09-26_19-26-26_abco\\json\\prompt_chunks\\prompt_chunk_0005.json",
+    "outputs\\archive_knowledgeSpace\\ks_runs\\Ailys\\2025-09-26_19-26-26_abco\\meta.json",
+    "outputs\\archive_knowledgeSpace\\ks_runs\\Ailys\\2025-09-26_19-27-16_s4i5\\meta.json",
+    "outputs\\archive_knowledgeSpace\\ks_runs\\Ailys\\2025-09-26_19-27-18_1dac\\meta.json",
+    "outputs\\archive_knowledgeSpace\\ks_runs\\Ailys\\2025-09-26_19-35-58_g6av\\meta.json",
+    "outputs\\archive_knowledgeSpace\\ks_timeline.json",
     "outputs\\ks_timeline.json",
     "venv\\Lib\\site-packages\\PySide6\\PySide6_Addons.json",
     "venv\\Lib\\site-packages\\PySide6\\PySide6_Essentials.json",
@@ -4287,24 +6334,8 @@
     "venv\\Lib\\site-packages\\numpy\\_core\\lib\\npy-pkg-config\\npymath.ini",
     "venv\\Lib\\site-packages\\numpy\\f2py\\setup.cfg",
     "venv\\Lib\\site-packages\\numpy\\typing\\tests\\data\\mypy.ini",
-    "venv\\Lib\\site-packages\\pkg_resources\\tests\\data\\my-test-package-source\\setup.cfg",
-    "venv\\Lib\\site-packages\\plotly\\labextension\\package.json",
-    "venv\\Lib\\site-packages\\plotly\\package_data\\templates\\ggplot2.json",
-    "venv\\Lib\\site-packages\\plotly\\package_data\\templates\\gridon.json",
-    "venv\\Lib\\site-packages\\plotly\\package_data\\templates\\plotly.json",
-    "venv\\Lib\\site-packages\\plotly\\package_data\\templates\\plotly_dark.json",
-    "venv\\Lib\\site-packages\\plotly\\package_data\\templates\\plotly_white.json",
-    "venv\\Lib\\site-packages\\plotly\\package_data\\templates\\presentation.json",
-    "venv\\Lib\\site-packages\\plotly\\package_data\\templates\\seaborn.json",
-    "venv\\Lib\\site-packages\\plotly\\package_data\\templates\\simple_white.json",
-    "venv\\Lib\\site-packages\\plotly\\package_data\\templates\\xgridoff.json",
-    "venv\\Lib\\site-packages\\plotly\\package_data\\templates\\ygridoff.json",
-    "venv\\Lib\\site-packages\\plotly\\validators\\_validators.json",
-    "venv\\Lib\\site-packages\\setuptools\\config\\distutils.schema.json",
-    "venv\\Lib\\site-packages\\setuptools\\config\\setuptools.schema.json",
-    "venv\\pyvenv.cfg",
-    "venv\\share\\jupyter\\labextensions\\jupyterlab-plotly\\install.json",
-    "venv\\share\\jupyter\\labextensions\\jupyterlab-plotly\\package.json"
+    "venv\\Lib\\site-packages\\pip\\_vendor\\distlib\\_backport\\sysconfig.cfg",
+    "venv\\pyvenv.cfg"
   ],
   "sqlite_schemas": {
     "data\\knowledge_space\\knowledge_space.db": {
@@ -4330,23 +6361,22 @@
   },
   "special_dirs": {
     "outputs": [
-      "D:\\Post-doc Work\\Ailys\\outputs"
+      "C:\\Post-doc Work\\Ailys\\outputs"
     ],
     "logs": [
-      "D:\\Post-doc Work\\Ailys\\outputs\\ks_viz\\units\\logs"
+      "C:\\Post-doc Work\\Ailys\\.git\\logs",
+      "C:\\Post-doc Work\\Ailys\\outputs\\archive_knowledgeSpace\\ks_viz\\units\\logs",
+      "C:\\Post-doc Work\\Ailys\\outputs\\ks_viz\\units\\logs"
     ],
     "cache": [],
     "data": [
-      "D:\\Post-doc Work\\Ailys\\data",
-      "D:\\Post-doc Work\\Ailys\\tasks\\data",
-      "D:\\Post-doc Work\\Ailys\\venv\\Lib\\site-packages\\numpy\\lib\\tests\\data",
-      "D:\\Post-doc Work\\Ailys\\venv\\Lib\\site-packages\\numpy\\random\\tests\\data",
-      "D:\\Post-doc Work\\Ailys\\venv\\Lib\\site-packages\\numpy\\typing\\tests\\data",
-      "D:\\Post-doc Work\\Ailys\\venv\\Lib\\site-packages\\numpy\\_core\\tests\\data",
-      "D:\\Post-doc Work\\Ailys\\venv\\Lib\\site-packages\\pkg_resources\\tests\\data",
-      "D:\\Post-doc Work\\Ailys\\venv\\Lib\\site-packages\\plotly\\data",
-      "D:\\Post-doc Work\\Ailys\\venv\\Lib\\site-packages\\plotly\\express\\data",
-      "D:\\Post-doc Work\\Ailys\\venv\\Lib\\site-packages\\plotly\\graph_objs\\layout\\template\\data"
+      "C:\\Post-doc Work\\Ailys\\data",
+      "C:\\Post-doc Work\\Ailys\\tasks\\data",
+      "C:\\Post-doc Work\\Ailys\\venv\\Lib\\site-packages\\numpy\\lib\\tests\\data",
+      "C:\\Post-doc Work\\Ailys\\venv\\Lib\\site-packages\\numpy\\random\\tests\\data",
+      "C:\\Post-doc Work\\Ailys\\venv\\Lib\\site-packages\\numpy\\typing\\tests\\data",
+      "C:\\Post-doc Work\\Ailys\\venv\\Lib\\site-packages\\numpy\\_core\\tests\\data",
+      "C:\\Post-doc Work\\Ailys\\venv\\Lib\\site-packages\\pkg_resources\\tests\\data"
     ],
     "artifacts": []
   },
@@ -4365,6 +6395,7 @@
     "venv\\Lib\\site-packages\\httpx\\_urlparse.py",
     "venv\\Lib\\site-packages\\numpy\\_core\\tests\\test_argparse.py",
     "venv\\Lib\\site-packages\\numpy\\random\\_examples\\cffi\\parse.py",
+    "venv\\Lib\\site-packages\\openai\\_utils\\_datetime_parse.py",
     "venv\\Lib\\site-packages\\openai\\resources\\batches.py",
     "venv\\Lib\\site-packages\\openai\\resources\\vector_stores\\file_batches.py",
     "venv\\Lib\\site-packages\\openai\\types\\batch.py",
@@ -4372,6 +6403,7 @@
     "venv\\Lib\\site-packages\\openai\\types\\batch_error.py",
     "venv\\Lib\\site-packages\\openai\\types\\batch_list_params.py",
     "venv\\Lib\\site-packages\\openai\\types\\batch_request_counts.py",
+    "venv\\Lib\\site-packages\\openai\\types\\batch_usage.py",
     "venv\\Lib\\site-packages\\openai\\types\\beta\\threads\\file_citation_annotation.py",
     "venv\\Lib\\site-packages\\openai\\types\\beta\\threads\\file_citation_delta_annotation.py",
     "venv\\Lib\\site-packages\\openai\\types\\chat\\parsed_chat_completion.py",
@@ -4380,6 +6412,10 @@
     "venv\\Lib\\site-packages\\openai\\types\\vector_stores\\file_batch_create_params.py",
     "venv\\Lib\\site-packages\\openai\\types\\vector_stores\\file_batch_list_files_params.py",
     "venv\\Lib\\site-packages\\openai\\types\\vector_stores\\vector_store_file_batch.py",
+    "venv\\Lib\\site-packages\\openai\\types\\webhooks\\batch_cancelled_webhook_event.py",
+    "venv\\Lib\\site-packages\\openai\\types\\webhooks\\batch_completed_webhook_event.py",
+    "venv\\Lib\\site-packages\\openai\\types\\webhooks\\batch_expired_webhook_event.py",
+    "venv\\Lib\\site-packages\\openai\\types\\webhooks\\batch_failed_webhook_event.py",
     "venv\\Lib\\site-packages\\packaging\\_parser.py",
     "venv\\Lib\\site-packages\\pandas\\core\\arrays\\sparse\\scipy_sparse.py",
     "venv\\Lib\\site-packages\\pandas\\io\\parsers\\arrow_parser_wrapper.py",
@@ -4398,23 +6434,18 @@
     "venv\\Lib\\site-packages\\pandas\\tests\\tslibs\\test_parse_iso8601.py",
     "venv\\Lib\\site-packages\\pip\\_internal\\cli\\main_parser.py",
     "venv\\Lib\\site-packages\\pip\\_internal\\cli\\parser.py",
-    "venv\\Lib\\site-packages\\pip\\_vendor\\packaging\\_parser.py",
+    "venv\\Lib\\site-packages\\pip\\_vendor\\html5lib\\html5parser.py",
     "venv\\Lib\\site-packages\\pip\\_vendor\\tomli\\_parser.py",
     "venv\\Lib\\site-packages\\pydantic\\datetime_parse.py",
     "venv\\Lib\\site-packages\\pydantic\\deprecated\\parse.py",
     "venv\\Lib\\site-packages\\pydantic\\parse.py",
     "venv\\Lib\\site-packages\\pydantic\\v1\\datetime_parse.py",
-    "venv\\Lib\\site-packages\\pydantic\\v1\\parse.py",
-    "venv\\Lib\\site-packages\\setuptools\\_vendor\\autocommand\\autoparse.py",
-    "venv\\Lib\\site-packages\\setuptools\\_vendor\\packaging\\_parser.py",
-    "venv\\Lib\\site-packages\\setuptools\\_vendor\\tomli\\_parser.py",
-    "venv\\Lib\\site-packages\\setuptools\\_vendor\\wheel\\vendored\\packaging\\_parser.py",
-    "venv\\Lib\\site-packages\\wheel\\vendored\\packaging\\_parser.py"
+    "venv\\Lib\\site-packages\\pydantic\\v1\\parse.py"
   ],
   "secrets_summary": {
-    "files_scanned": 6284,
+    "files_scanned": 4663,
     "matches_found": 0
   },
   "errors": [],
-  "duration_sec": 92.2
+  "duration_sec": 49.09
 }

@@ -1,0 +1,13 @@
+{
+  "timestamp_utc": "2025-10-20T15:03:02.492494",
+  "description": "Literature Search: generate keywords and boolean queries",
+  "provider": "openai",
+  "model": "gpt-5",
+  "parameters": {
+    "temperature": null,
+    "max_tokens": null,
+    "max_completion_tokens": 2000
+  },
+  "messages_count": 2,
+  "status": "about_to_call"
+}

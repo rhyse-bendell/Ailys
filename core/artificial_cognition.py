@@ -154,17 +154,29 @@ def _exchanges_dir() -> Path:
     print(f"[cognition:PERSIST] exchanges_dir = {p}  (cwd={Path.cwd()})")
     return p
 
-def _persist_snapshot(call_id: str, suffix: str, payload: Dict[str, Any]) -> str:
+def _persist_snapshot(call_id: str, suffix: str, payload: Dict[str, Any], *, run_dir: Optional[Path] = None, seq: Optional[List[int]] = None) -> str:
     """
     Write a small JSON snapshot for a stage in the lifecycle (queued, preflight, denied, etc.).
-    File name: <utc>_<callid>_<suffix>.json
+    If run_dir/seq are provided, files are written inside that folder with a 000-, 001-, ... prefix.
+    Otherwise we fall back to the old flat "<utc>_<callid>_<suffix>.json" behavior.
     Always best-effort; never throws.
     """
     try:
         base = _exchanges_dir()
         ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
-        path = base / f"{ts}_{call_id}_{suffix}.json"
-        base.mkdir(parents=True, exist_ok=True)
+
+        if run_dir is None:
+            path = base / f"{ts}_{call_id}_{suffix}.json"
+        else:
+            run_dir.mkdir(parents=True, exist_ok=True)
+            # sequence handling
+            if seq is not None and len(seq) == 1:
+                n = seq[0]
+                seq[0] += 1
+            else:
+                n = 0
+            path = run_dir / f"{n:03d}_{suffix}.json"
+
         with open(path, "w", encoding="utf-8") as f:
             json.dump(payload, f, ensure_ascii=False, indent=2)
             try:
@@ -179,13 +191,28 @@ def _persist_snapshot(call_id: str, suffix: str, payload: Dict[str, Any]) -> str
         return ""
 
 
-def _persist_exchange(record: Dict[str, Any]) -> str:
+
+def _persist_exchange(record: Dict[str, Any], *, run_dir: Optional[Path] = None, seq: Optional[List[int]] = None, filename_hint: Optional[str] = None) -> str:
     """
     Write the full exchange record as JSON and return the absolute path.
+    If run_dir/seq are provided, write into that folder with sequence prefix and optional filename_hint.
+    Otherwise fall back to legacy flat naming.
     """
     ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
     sid = uuid.uuid4().hex[:8]
-    path = _exchanges_dir() / f"{ts}_{sid}.json"
+
+    if run_dir is None:
+        path = _exchanges_dir() / f"{ts}_{sid}.json"
+    else:
+        run_dir.mkdir(parents=True, exist_ok=True)
+        if seq is not None and len(seq) == 1:
+            n = seq[0]
+            seq[0] += 1
+        else:
+            n = 0
+        hint = f"_{filename_hint}" if filename_hint else ""
+        path = run_dir / f"{n:03d}{hint}.json"
+
     try:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(record, f, ensure_ascii=False, indent=2)
@@ -194,6 +221,7 @@ def _persist_exchange(record: Dict[str, Any]) -> str:
         print(f"[cognition:PERSIST] ERROR writing {path}: {e}")
         print(traceback.format_exc())
     return str(path.resolve())
+
 
 def _with_arg(args: Dict[str, Any], key: str, value: Any, *, remove: Optional[List[str]] = None) -> Dict[str, Any]:
     out = dict(args)
@@ -245,6 +273,11 @@ def ask(
 
     call_id = uuid.uuid4().hex[:8]
 
+    # Per-run folder + sequence counter (ensures every artifact for this call stays together)
+    run_ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    run_dir = _exchanges_dir() / f"{run_ts}_{call_id}"
+    seq = [0]  # monotonic counter for files in run_dir
+
     # Stage 1: awaiting approval snapshot
     _persist_snapshot(call_id, "queued", {
         "timestamp_utc": datetime.utcnow().isoformat(),
@@ -255,7 +288,7 @@ def ask(
         "parameters": {"temperature": temperature, "max_tokens": max_tokens},
         "messages_count": len(messages or []),
         "status": "awaiting_approval",
-    })
+    }, run_dir=run_dir, seq=seq)
 
     def _do_call(overrides: Optional[Dict[str, Any]] = None) -> CognitionResult:
         # We only import and read keys *inside* the call to respect approval gating.
@@ -334,16 +367,19 @@ def ask(
                 },
                 "messages_count": len(messages),
                 "status": "about_to_call"
-            })
+            }, run_dir=run_dir, seq=seq)
 
             resp = client.chat.completions.create(**args)
 
-            # Success extract
+            # --- Extract content (chat.completions) and usage
+            # NOTE: If we ever switch endpoints, this code will intentionally expose a "no text but tokens > 0"
+            # situation with a high-signal error message below.
             try:
                 content = resp.choices[0].message.content or ""
             except Exception:
                 content = ""
 
+            # usage
             try:
                 usage = {
                     "prompt_tokens": getattr(resp.usage, "prompt_tokens", None),
@@ -353,6 +389,7 @@ def ask(
             except Exception:
                 usage = None
 
+            # structured dump for forensics
             try:
                 resp_dump = resp.model_dump()
             except Exception:
@@ -360,6 +397,20 @@ def ask(
                     resp_dump = resp.to_dict()
                 except Exception:
                     resp_dump = str(resp)
+
+            # response shape breadcrumb (helps triage when empty content)
+            try:
+                top_keys = list(resp_dump.keys()) if isinstance(resp_dump, dict) else []
+            except Exception:
+                top_keys = []
+
+            # mark truncation if we hit the configured cap
+            provided_cap = args.get("max_completion_tokens", args.get("max_tokens"))
+            if usage and isinstance(usage.get("completion_tokens"), int) and isinstance(provided_cap, int):
+                if usage["completion_tokens"] >= provided_cap:
+                    usage["truncated"] = True
+                    print(
+                        f"[cognition:INFO] id={call_id} attempt={attempt_idx} – output likely truncated by token cap ({usage['completion_tokens']}/{provided_cap}).")
 
             # Truncate massive payloads
             try:
@@ -387,9 +438,54 @@ def ask(
                 "raw_text": content,
                 "usage": usage,
                 "error": None,
-            })
+            }, run_dir=run_dir, seq=seq, filename_hint=f"exchange_attempt{attempt_idx}")
+
 
             raw_out = content if isinstance(content, str) else str(content)
+
+            # If the model says it generated tokens but we got no text, surface a precise, actionable error.
+            if (not raw_out.strip()) and usage and isinstance(usage.get("completion_tokens"), int) and usage[
+                "completion_tokens"] > 0:
+                # Keep file name of the last persisted exchange for breadcrumbing
+                last_path = _persist_exchange({
+                    "call_id": call_id,
+                    "attempt": attempt_idx,
+                    "timestamp_utc": datetime.utcnow().isoformat(),
+                    "description": f"{description} (empty-text anomaly record)",
+                    "provider": prov,
+                    "model": args.get("model", eff_model),
+                    "base_url": _base_url(),
+                    "parameters": {
+                        "temperature": args.get("temperature"),
+                        "max_tokens": args.get("max_tokens"),
+                        "max_completion_tokens": args.get("max_completion_tokens"),
+                    },
+                    "messages": messages,
+                    "response": resp_dump,
+                    "raw_text": raw_out,
+                    "usage": usage,
+                    "error": {
+                        "type": "EmptyTextWithTokenUsage",
+                        "message": "No plain text returned, but completion_tokens > 0. This usually means truncation by token cap OR a non-text/tool response shape.",
+                        "response_top_keys": top_keys,
+                    },
+                }, run_dir=run_dir, seq=seq, filename_hint=f"exchange_attempt{attempt_idx}_empty_text")
+
+                # Build human-friendly diagnostic
+                cap_name = "max_completion_tokens" if "max_completion_tokens" in args else "max_tokens"
+                cap_val = args.get(cap_name)
+                truncated_note = ""
+                if usage.get("truncated"):
+                    truncated_note = f" (likely truncated at {cap_name}={cap_val})"
+
+                raise RuntimeError(
+                    "Model returned no plain text, but reported token usage."
+                    f"{truncated_note}\n"
+                    f"completion_tokens={usage.get('completion_tokens')}, prompt_tokens={usage.get('prompt_tokens')}, total_tokens={usage.get('total_tokens')}\n"
+                    f"Response keys: {top_keys}\n"
+                    f"Forensics saved to: {last_path}"
+                )
+
             print(f"[cognition:RETURN] id={call_id} attempt={attempt_idx} len(raw_text)={len(raw_out)} usage={usage}")
             return CognitionResult(model_id=args.get("model", eff_model), raw_text=raw_out, usage=usage, provider=prov)
 
@@ -429,7 +525,7 @@ def ask(
                             "provider": prov,
                             "model": args.get("model", eff_model),
                             "status": "approval_denied_or_no_result"
-                        })
+                        }, run_dir=run_dir, seq=seq)
                         raise RuntimeError("Retry approval declined or failed; no result returned.")
                     if not isinstance(approved_result, CognitionResult):
                         raise RuntimeError(f"Unexpected retry result type: {type(approved_result)!r}")
@@ -462,7 +558,7 @@ def ask(
                     "raw_text": "",
                     "usage": None,
                     "error": err_info,
-                })
+                }, run_dir=run_dir, seq=seq, filename_hint=f"exchange_attempt{attempt_idx}")
 
                 if attempt >= MAX_ATTEMPTS:
                     print(f"[cognition:ERROR] id={call_id} attempt={attempt} – no more retries.")
@@ -522,7 +618,7 @@ def ask(
                         "max_completion_tokens": new_args.get("max_completion_tokens"),
                     },
                     "status": "retry_requested"
-                })
+                }, run_dir=run_dir, seq=seq)
 
                 args = new_args
                 attempt += 1
@@ -542,7 +638,7 @@ def ask(
             "provider": prov,
             "model": mdl,
             "status": "no_request_approval_function"
-        })
+        }, run_dir=run_dir, seq=seq)
         raise RuntimeError("Approval system not available: request_approval function not found.")
 
     # Record that we're enqueueing this call for approval
@@ -552,7 +648,7 @@ def ask(
         "provider": prov,
         "model": mdl,
         "status": "enqueue_request"
-    })
+    }, run_dir=run_dir, seq=seq)
     print("[cognition:APPROVAL] Enqueuing approval for cognition call...")
 
     # Enqueue and wait for user approval (or auto/dryrun per mode)
@@ -570,7 +666,7 @@ def ask(
         "model": mdl,
         "status": "approval_returned",
         "result_type": (type(result).__name__ if result is not None else "None")
-    })
+    }, run_dir=run_dir, seq=seq)
     print(f"[cognition:APPROVAL] Approval returned with type="
           f"{type(result).__name__ if result is not None else 'None'}")
 
@@ -581,7 +677,7 @@ def ask(
             "provider": prov,
             "model": mdl,
             "status": "approval_denied_or_no_result"
-        })
+        }, run_dir=run_dir, seq=seq)
         raise RuntimeError("Approval declined or failed; no result returned.")
 
     if not isinstance(result, CognitionResult):

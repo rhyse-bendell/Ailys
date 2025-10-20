@@ -118,6 +118,14 @@ class AilysGUI(QWidget):
         self.approvals_list = QListWidget()
         right_layout.addWidget(self.approvals_list, 1)
 
+        # --- Approvals pane state for robust updates ---
+        self._approvals_last_ids = []  # last known ordering of request IDs
+        self._approvals_selected_id = None  # remember selection across refreshes
+        self._last_pending_count = -1  # for notification dedupe
+
+        # keep _approvals_selected_id in sync when user changes row
+        self.approvals_list.currentRowChanged.connect(lambda _: self._remember_selection())
+
         # Info/status line
         self.approvals_info = QLabel("")
         self.approvals_info.setStyleSheet("color: #555;")
@@ -218,6 +226,10 @@ class AilysGUI(QWidget):
     # ----------------- Common helpers -----------------
 
     # ---- Approvals pane helpers -------------------------------------------------
+    def _remember_selection(self):
+        rid = self._selected_request_id()
+        if rid is not None:
+            self._approvals_selected_id = rid
 
     def _selected_request_id(self) -> Optional[int]:
         item = self.approvals_list.currentItem()
@@ -234,17 +246,43 @@ class AilysGUI(QWidget):
 
     def refresh_approvals_pane(self):
         try:
-            pending = approvals.get_pending_requests() if hasattr(approvals,
-                                                                  "get_pending_requests") else approvals.approval_queue.get_pending_requests()
+            pending = approvals.get_pending_requests() if hasattr(approvals, "get_pending_requests") \
+                else approvals.approval_queue.get_pending_requests()
         except Exception:
             pending = approvals.approval_queue.get_pending_requests()
 
-        self.approvals_list.clear()
-        for r in pending:
-            self.approvals_list.addItem(f"[{r.id}] {r.description}")
+        # compute new id list
+        new_ids = [r.id for r in pending]
 
+        # update info line (always)
         n = len(pending)
         self.approvals_info.setText(f"Pending approvals: {n}" if n else "No pending approvals.")
+
+        # if content didn't change, don't repaint; preserves selection automatically
+        if new_ids == self._approvals_last_ids:
+            return
+
+        # remember selection (id) before rebuild
+        self._remember_selection()
+
+        # rebuild only when changed
+        self.approvals_list.setUpdatesEnabled(False)
+        try:
+            self.approvals_list.clear()
+            for r in pending:
+                self.approvals_list.addItem(f"[{r.id}] {r.description}")
+
+            # restore selection if still present
+            if self._approvals_selected_id is not None:
+                target = f"[{self._approvals_selected_id}] "
+                for i in range(self.approvals_list.count()):
+                    if self.approvals_list.item(i).text().startswith(target):
+                        self.approvals_list.setCurrentRow(i)
+                        break
+        finally:
+            self.approvals_list.setUpdatesEnabled(True)
+
+        self._approvals_last_ids = new_ids
 
     def approve_selected_request(self):
         rid = self._selected_request_id()
@@ -270,36 +308,40 @@ class AilysGUI(QWidget):
                 except ValueError:
                     self.chat_log.append("⚠️ Timeout must be a number (seconds); ignoring override.")
 
-            # Build overrides dict from the UI (only include valid entries)
-            overrides = {}
-            m = self.override_model.text().strip()
-            if m:
-                overrides["model"] = m
-            t = self.override_max_tokens.text().strip()
-            if t:
-                try:
-                    overrides["max_tokens"] = int(t)
-                except ValueError:
-                    self.chat_log.append("⚠️ Max Tokens must be an integer; ignoring override.")
-            to = self.override_timeout.text().strip()
-            if to:
-                try:
-                    overrides["timeout"] = float(to)
-                except ValueError:
-                    self.chat_log.append("⚠️ Timeout must be a number (seconds); ignoring override.")
+            # Disable buttons while approving
+            self.btn_approve_selected.setEnabled(False)
+            self.btn_deny_selected.setEnabled(False)
+            self.btn_refresh_approvals.setEnabled(False)
 
-            # use module-level helper if present; fallback to instance
-            if hasattr(approvals, "approve_request"):
-                approvals.approve_request(rid, overrides or None)
-            else:
-                approvals.approval_queue.approve_request(rid, overrides or None)
+            def _do_approve():
+                # perform the approve on a background thread so UI stays responsive
+                if hasattr(approvals, "approve_request"):
+                    approvals.approve_request(rid, overrides or None)
+                else:
+                    approvals.approval_queue.approve_request(rid, overrides or None)
+                return True, f"Approved request {rid}"
 
-            self.chat_log.append(f"✅ Approved request {rid}.")
+            self._approve_thread = TaskRunnerThread(_do_approve)
+            self._approve_thread.update_status.connect(self.chat_log.append)
 
+            def _done(ok, msg):
+                # Re-enable buttons and refresh the pane
+                self.btn_approve_selected.setEnabled(True)
+                self.btn_deny_selected.setEnabled(True)
+                self.btn_refresh_approvals.setEnabled(True)
+                # show status
+                if ok:
+                    self.chat_log.append(f"✅ {msg}.")
+                else:
+                    self.chat_log.append(f"❌ Approve error: {msg}")
+                self.refresh_approvals_pane()
+
+            self._approve_thread.finished.connect(_done)
+            self._approve_thread.start()
 
         except Exception as e:
             self.chat_log.append(f"❌ Approve error: {e}")
-        self.refresh_approvals_pane()
+            self.refresh_approvals_pane()
 
     def deny_selected_request(self):
         rid = self._selected_request_id()
@@ -307,27 +349,53 @@ class AilysGUI(QWidget):
             self.approvals_info.setText("Select a request to deny.")
             return
         try:
-            # use module-level helper if present; fallback to instance
-            ok = approvals.deny_request(rid) if hasattr(approvals,
-                                                        "deny_request") else approvals.approval_queue.deny_request(rid)
-            if ok is False:
-                self.chat_log.append("⚠️ Could not deny request (maybe already resolved).")
-            else:
-                self.chat_log.append(f"🚫 Denied request {rid}.")
+            # Disable buttons while denying
+            self.btn_approve_selected.setEnabled(False)
+            self.btn_deny_selected.setEnabled(False)
+            self.btn_refresh_approvals.setEnabled(False)
+
+            def _do_deny():
+                ok = approvals.deny_request(rid) if hasattr(approvals, "deny_request") \
+                    else approvals.approval_queue.deny_request(rid)
+                if ok is False:
+                    return False, "Could not deny request (maybe already resolved)."
+                return True, f"Denied request {rid}"
+
+            self._deny_thread = TaskRunnerThread(_do_deny)
+            self._deny_thread.update_status.connect(self.chat_log.append)
+
+            def _done(ok, msg):
+                self.btn_approve_selected.setEnabled(True)
+                self.btn_deny_selected.setEnabled(True)
+                self.btn_refresh_approvals.setEnabled(True)
+                self.chat_log.append(("✅ " if ok else "⚠️ ") + msg)
+                self.refresh_approvals_pane()
+
+            self._deny_thread.finished.connect(_done)
+            self._deny_thread.start()
+
         except Exception as e:
             self.chat_log.append(f"❌ Deny error: {e}")
-        self.refresh_approvals_pane()
+            self.refresh_approvals_pane()
 
     def check_approval_notifications(self):
         pending = approvals.approval_queue.get_pending_requests()
-        print(f"[GUI timer] queue_id={id(approvals.approval_queue)} pending={len(pending)}")
-        if pending:
-            self.chat_log.append(f"⚠️ {len(pending)} approval request(s) pending.")
-            try:
-                self.chat_display.append(
-                    f"⚠️ Ailys: You have {len(pending)} API request(s) waiting in the Approvals pane.")
-            except Exception:
-                pass
+        count = len(pending)
+        print(f"[GUI timer] queue_id={id(approvals.approval_queue)} pending={count}")
+
+        # only log when the number changes
+        if count != self._last_pending_count:
+            if count > 0:
+                self.chat_log.append(f"⚠️ {count} approval request(s) pending.")
+                try:
+                    self.chat_display.append(
+                        f"⚠️ Ailys: You have {count} API request(s) waiting in the Approvals pane."
+                    )
+                except Exception:
+                    pass
+            self._last_pending_count = count
+
+        # update list using the selection-preserving refresh
         self.refresh_approvals_pane()
 
     def ask_ks_mode(self, title: str = "Select source mode"):
@@ -1188,12 +1256,20 @@ class AilysGUI(QWidget):
         self.chat_display.append(f"You: {message}")
         self.chat_input.clear()
 
-        try:
-            self.chat_display.append("Ailys is thinking... (may require approval)")
-            reply = self.chat_session.send(message, description="GUI Chat")
-            self.chat_display.append(f"Ailys: {reply.strip()}")
-        except Exception as e:
-            self.chat_display.append(f"❌ Error: {e}")
+        self.chat_display.append("Ailys is thinking... (may require approval)")
+
+        def _task():
+            try:
+                reply = self.chat_session.send(message, description="GUI Chat")
+                return True, reply
+            except Exception as e:
+                return False, str(e)
+
+        self.chat_thread = TaskRunnerThread(_task)
+        self.chat_thread.finished.connect(
+            lambda ok, msg: self.chat_display.append(f"Ailys: {msg.strip()}" if ok else f"❌ Error: {msg}")
+        )
+        self.chat_thread.start()
 
     def _chat_reset_via_task(self):
         # Task owns reset; GUI just updates visuals with the returned banner
