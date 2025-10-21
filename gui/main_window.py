@@ -124,7 +124,9 @@ class AilysGUI(QWidget):
         self._last_pending_count = -1  # for notification dedupe
 
         # keep _approvals_selected_id in sync when user changes row
-        self.approvals_list.currentRowChanged.connect(lambda _: self._remember_selection())
+        self.approvals_list.currentRowChanged.connect(
+            lambda _: (self._remember_selection(), self._update_overrides_panel_state())
+        )
 
         # Info/status line
         self.approvals_info = QLabel("")
@@ -149,6 +151,12 @@ class AilysGUI(QWidget):
         ov_layout.addWidget(self.override_max_tokens)
         ov_layout.addWidget(QLabel("Timeout (seconds):"))
         ov_layout.addWidget(self.override_timeout)
+
+        # Show cost/flags (e.g., token-free requests)
+        self.overrides_cost_label = QLabel("")
+        self.overrides_cost_label.setStyleSheet("color: #2b6; font-style: italic;")
+        ov_layout.addWidget(self.overrides_cost_label)
+
 
         right_layout.addWidget(overrides_box)
 
@@ -244,6 +252,29 @@ class AilysGUI(QWidget):
             pass
         return None
 
+    def _update_overrides_panel_state(self):
+        """
+        If the selected approval describes a token-free (network-only) task,
+        disable model/token overrides and show a cost hint.
+        We detect this via the description text containing 'NO LLM TOKENS'.
+        """
+        try:
+            item = self.approvals_list.currentItem()
+            text = item.text() if item else ""
+            is_network_only = ("NO LLM TOKENS" in text) if text else False
+            self.override_model.setEnabled(not is_network_only)
+            self.override_max_tokens.setEnabled(not is_network_only)
+            # Timeout is still relevant for network calls
+            self.override_timeout.setEnabled(True)
+            self.overrides_cost_label.setText("Cost: 0 tokens (network-only)" if is_network_only else "")
+        except Exception:
+            # Fail open
+            self.override_model.setEnabled(True)
+            self.override_max_tokens.setEnabled(True)
+            self.override_timeout.setEnabled(True)
+            self.overrides_cost_label.setText("")
+
+
     def refresh_approvals_pane(self):
         try:
             pending = approvals.get_pending_requests() if hasattr(approvals, "get_pending_requests") \
@@ -260,6 +291,7 @@ class AilysGUI(QWidget):
 
         # if content didn't change, don't repaint; preserves selection automatically
         if new_ids == self._approvals_last_ids:
+            self._update_overrides_panel_state()
             return
 
         # remember selection (id) before rebuild
@@ -283,6 +315,7 @@ class AilysGUI(QWidget):
             self.approvals_list.setUpdatesEnabled(True)
 
         self._approvals_last_ids = new_ids
+        self._update_overrides_panel_state()
 
     def approve_selected_request(self):
         rid = self._selected_request_id()
@@ -308,13 +341,9 @@ class AilysGUI(QWidget):
                 except ValueError:
                     self.chat_log.append("⚠️ Timeout must be a number (seconds); ignoring override.")
 
-            # Disable buttons while approving
-            self.btn_approve_selected.setEnabled(False)
-            self.btn_deny_selected.setEnabled(False)
-            self.btn_refresh_approvals.setEnabled(False)
-
+            # IMPORTANT: Do NOT disable the buttons here; nested approvals may appear immediately.
+            # Run approve on a background thread and keep the UI interactive.
             def _do_approve():
-                # perform the approve on a background thread so UI stays responsive
                 if hasattr(approvals, "approve_request"):
                     approvals.approve_request(rid, overrides or None)
                 else:
@@ -325,11 +354,7 @@ class AilysGUI(QWidget):
             self._approve_thread.update_status.connect(self.chat_log.append)
 
             def _done(ok, msg):
-                # Re-enable buttons and refresh the pane
-                self.btn_approve_selected.setEnabled(True)
-                self.btn_deny_selected.setEnabled(True)
-                self.btn_refresh_approvals.setEnabled(True)
-                # show status
+                # Do not toggle button enabled states; simply refresh list + show status.
                 if ok:
                     self.chat_log.append(f"✅ {msg}.")
                 else:
@@ -338,6 +363,9 @@ class AilysGUI(QWidget):
 
             self._approve_thread.finished.connect(_done)
             self._approve_thread.start()
+            # Give immediate feedback and also refresh list so new child approvals show up.
+            self.chat_log.append(f"⏩ Approval dispatched for [{rid}]. You may approve subsequent requests now.")
+            self.refresh_approvals_pane()
 
         except Exception as e:
             self.chat_log.append(f"❌ Approve error: {e}")
@@ -349,11 +377,7 @@ class AilysGUI(QWidget):
             self.approvals_info.setText("Select a request to deny.")
             return
         try:
-            # Disable buttons while denying
-            self.btn_approve_selected.setEnabled(False)
-            self.btn_deny_selected.setEnabled(False)
-            self.btn_refresh_approvals.setEnabled(False)
-
+            # Keep UI interactive; do NOT disable buttons.
             def _do_deny():
                 ok = approvals.deny_request(rid) if hasattr(approvals, "deny_request") \
                     else approvals.approval_queue.deny_request(rid)
@@ -365,14 +389,13 @@ class AilysGUI(QWidget):
             self._deny_thread.update_status.connect(self.chat_log.append)
 
             def _done(ok, msg):
-                self.btn_approve_selected.setEnabled(True)
-                self.btn_deny_selected.setEnabled(True)
-                self.btn_refresh_approvals.setEnabled(True)
                 self.chat_log.append(("✅ " if ok else "⚠️ ") + msg)
                 self.refresh_approvals_pane()
 
             self._deny_thread.finished.connect(_done)
             self._deny_thread.start()
+            # Immediate refresh so the list reflects the action quickly.
+            self.refresh_approvals_pane()
 
         except Exception as e:
             self.chat_log.append(f"❌ Deny error: {e}")
@@ -673,6 +696,8 @@ class AilysGUI(QWidget):
         self.btn_ls_open.setEnabled(False)
         layout.addWidget(self.btn_ls_filter)
         layout.addWidget(self.btn_ls_open)
+        self.btn_ls_open.clicked.connect(self.open_ls_output_folder)
+
 
         # Browse handlers
         def browse_aug_csv():
@@ -772,6 +797,30 @@ class AilysGUI(QWidget):
         self.thread.update_status.connect(self.chat_log.append)
         self.thread.finished.connect(self.task_finished_with_result)
         self.thread.start()
+
+    def open_ls_output_folder(self):
+        """Open the last known Lit Search output folder in the system file explorer."""
+        try:
+            out_dir = getattr(self, "_ls_last_out_dir", None)
+            if not out_dir or not os.path.isdir(out_dir):
+                self.chat_log.append("ℹ️ No output folder available yet.")
+                return
+            # Windows
+            try:
+                os.startfile(out_dir)
+                return
+            except AttributeError:
+                pass
+            # macOS
+            if sys.platform == "darwin":
+                import subprocess
+                subprocess.Popen(["open", out_dir])
+                return
+            # Linux
+            import subprocess
+            subprocess.Popen(["xdg-open", out_dir])
+        except Exception as e:
+            self.chat_log.append(f"⚠️ Could not open folder: {e}")
 
     def create_literature_tab(self):
         lit_tab = QWidget()
@@ -1177,6 +1226,17 @@ class AilysGUI(QWidget):
             pass
         if success:
             self.chat_log.append(f"✅ {message}")
+            # If the task returned a “CSV written: <path> …” message, remember its folder.
+            try:
+                # Expected format: 'CSV written: <full_path>  (raw: N, deduped: M)'
+                if "CSV written:" in message:
+                    path_part = message.split("CSV written:", 1)[1].strip()
+                    out_path = path_part.split("  (", 1)[0].strip()
+                    if os.path.exists(out_path):
+                        self._ls_last_out_dir = os.path.dirname(out_path)
+                        self.btn_ls_open.setEnabled(True)
+            except Exception:
+                pass
         else:
             self.chat_log.append(f"❌ Task failed: {message}")
 
