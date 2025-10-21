@@ -1,9 +1,41 @@
 # tasks/lit_search_collect.py
+from __future__ import annotations
+
 import os, csv, datetime, re, time, html, unicodedata
 from collections import defaultdict
 from typing import Optional, Dict, List, Tuple
 from core.lit.utils import to_list, run_dirs
 import core.approval_queue as approvals
+
+
+DEBUG_LIT = os.getenv("LIT_DEBUG", "1") != "0"
+
+def _dbg(msg: str):
+    if DEBUG_LIT:
+        print(f"[debug] {msg}")
+
+def _write_log_line(path: str, line: str):
+    try:
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(line.rstrip() + "\n")
+    except Exception:
+        pass
+
+def _should_stop(stop_flag_path: str | None = None) -> bool:
+    """
+    Returns True if a stop was requested via env var LIT_STOP=1 or a STOP file on disk.
+    """
+    try:
+        if os.getenv("LIT_STOP", "") == "1":
+            return True
+        if stop_flag_path and os.path.exists(stop_flag_path):
+            return True
+    except Exception:
+        pass
+    return False
+# === [PATCH Q END] ===
+
 
 def _with_temp_approval_mode(temp_mode: str, fn):
     """
@@ -235,6 +267,121 @@ def _simplify_boolean(q: str) -> str:
     s = re.sub(r"\s+", " ", s).strip()
     return s
 
+
+
+def _build_pubmed_queries(spec: QuerySpec, base_boolean: str) -> List[str]:
+    """PubMed: preserve Boolean + phrases; tag Title/Abstract; chunk OR lists."""
+    queries = []
+    must = [f'{_phrase(p)}[Title/Abstract]' for p in (spec.must_phrases or []) if p.strip()]
+    anys = [f'{_phrase(p)}[Title/Abstract]' for p in (spec.any_phrases or []) if p.strip()]
+    nots = [f'{_phrase(p)}[Title/Abstract]' for p in (spec.exclude_terms or []) if p.strip()]
+    any_chunks = _chunk(anys, 4) if anys else [[]]
+    for ch in any_chunks:
+        parts = []
+        if must: parts.append("(" + " AND ".join(must) + ")")
+        if ch:   parts.append("(" + " OR ".join(ch) + ")")
+        if base_boolean: parts.append(f"({base_boolean})")
+        if nots: parts.append("NOT (" + " OR ".join(nots) + ")")
+        q = " AND ".join([p for p in parts if p])
+        if q.strip(): queries.append(q)
+    return queries or ([base_boolean] if base_boolean else [])
+
+def _build_arxiv_queries(spec: QuerySpec, base_boolean: str) -> List[str]:
+    """arXiv: ti:/abs: fields, optional categories; keep phrases; avoid over-nesting."""
+    tiabs = []
+    for p in (spec.must_phrases or []):
+        if p.strip():
+            tiabs.append(f'ti:{_phrase(p)} OR abs:{_phrase(p)}')
+    anys = [f'ti:{_phrase(p)} OR abs:{_phrase(p)}' for p in (spec.any_phrases or []) if p.strip()]
+    any_chunks = _chunk(anys, 3) if anys else [[]]
+    cats = []
+    for d in (spec.domains or []):
+        dl = d.strip().lower()
+        if dl in ("cs.ai","ai","artificial intelligence"): cats.append("cat:cs.AI")
+        elif dl in ("cs.hc","hci","human-computer interaction"): cats.append("cat:cs.HC")
+        elif dl in ("stat.ml","ml"): cats.append("cat:stat.ML")
+    cat_clause = ("(" + " OR ".join(cats) + ")") if cats else ""
+    queries = []
+    for ch in any_chunks:
+        parts = []
+        if tiabs: parts.append("(" + " AND ".join([f"({c})" for c in tiabs]) + ")")
+        if ch:    parts.append("(" + " OR ".join([f"({c})" for c in ch]) + ")")
+        if base_boolean: parts.append(f"({_clean_text(base_boolean)})")
+        if cat_clause: parts.append(cat_clause)
+        q = " AND ".join([p for p in parts if p])
+        if q.strip(): queries.append(q)
+    return queries or ([base_boolean] if base_boolean else [])
+
+def _build_openalex_queries(spec: QuerySpec, base_boolean: str) -> List[str]:
+    """OpenAlex: avoid AND/OR/parens; use a trimmed bag-of-words string with quoted phrases OK."""
+    seeds = []
+    seeds += [p for p in (spec.must_phrases or []) if p.strip()]
+    seeds += [p for p in (spec.any_phrases or []) if p.strip()]
+    seeds += [p for p in (spec.title_bias_terms or []) if p.strip()]
+    # Convert base_boolean to a bag for OpenAlex
+    base_bow = _bag_of_words(base_boolean)
+    # Pack small groups to probe recall while staying under length limits
+    packs = _chunk(seeds, 5) or [[]]
+    queries = []
+    for pack in packs:
+        parts = []
+        if pack: parts.append(" ".join(_phrase(p) for p in pack))
+        if base_bow: parts.append(base_bow)
+        q = _trim_len(" ".join(parts).strip(), 300)
+        if q: queries.append(q)
+    # Ensure at least one
+    return queries or ([base_bow] if base_bow else [])
+
+
+def _build_crossref_queries(spec: QuerySpec, base_boolean: str) -> List[str]:
+    """Crossref: tolerant; quoted phrases + venue/type hints; boolean optional."""
+    hints = []
+    if spec.venues:    hints += [f'"{v}"' for v in spec.venues if v.strip()]
+    if spec.doc_types: hints += [t for t in spec.doc_types if t.strip()]
+    seeds = []
+    seeds += [p for p in (spec.must_phrases or []) if p.strip()]
+    seeds += [p for p in (spec.any_phrases or []) if p.strip()]
+    base_soft = _strip_label_and_parens(base_boolean)  # Crossref will tolerate operators, but soft is safer
+    packs = _chunk(seeds, 6) or [[]]
+    queries = []
+    for pack in packs:
+        parts = []
+        if pack: parts.append(" ".join(_phrase(p) for p in pack))
+        if hints: parts.append(" ".join(hints))
+        if base_soft: parts.append(base_soft)
+        q = _trim_len(" ".join(parts).strip(), 500)
+        if q: queries.append(q)
+    return queries or ([base_soft] if base_soft else [])
+
+
+def _build_s2_queries(spec: QuerySpec, base_boolean: str) -> List[str]:
+    """Semantic Scholar: prefer plain text/quoted phrases; avoid boolean operators."""
+    seeds = []
+    seeds += [p for p in (spec.must_phrases or []) if p.strip()]
+    seeds += [p for p in (spec.any_phrases or []) if p.strip()]
+    base_bow = _bag_of_words(base_boolean)
+    packs = _chunk(seeds, 6) or [[]]
+    queries = []
+    for pack in packs:
+        parts = []
+        if pack: parts.append(" ".join(_phrase(p) for p in pack))
+        if base_bow: parts.append(base_bow)
+        q = _trim_len(" ".join(parts).strip(), 300)
+        if q: queries.append(q)
+    return queries or ([base_bow] if base_bow else [])
+
+
+def _plan_queries_for_engine(engine: str, spec: QuerySpec, base_boolean: str) -> List[str]:
+    e = engine.lower()
+    if e == "pubmed":           return _build_pubmed_queries(spec, base_boolean)
+    if e == "arxiv":            return _build_arxiv_queries(spec, base_boolean)
+    if e == "openalex":         return _build_openalex_queries(spec, base_boolean)
+    if e == "crossref":         return _build_crossref_queries(spec, base_boolean)
+    if e == "semanticscholar":  return _build_s2_queries(spec, base_boolean)
+    return [base_boolean] if base_boolean else []
+
+
+
 def _force_engine(rows, engine_name: str):
     """Ensure every row has the engine field correctly set."""
     if not rows:
@@ -298,6 +445,104 @@ CSV2_HEADER = [
     "year","venue","doi","url","abstract","source_score"
 ]
 
+
+from dataclasses import dataclass
+
+@dataclass
+class QuerySpec:
+    run_id: str
+    boolean_queries: List[str]
+    seed_terms: List[str]
+    expanded_terms: List[str]
+    # Optional structured fields (safe defaults):
+    years_from: Optional[int] = None
+    years_to: Optional[int] = None
+    must_phrases: List[str] = None
+    any_phrases: List[str] = None
+    exclude_terms: List[str] = None
+    title_bias_terms: List[str] = None
+    domains: List[str] = None
+    doc_types: List[str] = None
+    venues: List[str] = None
+
+def _to_int_or_none(v: str | None) -> Optional[int]:
+    if not v: return None
+    v = str(v).strip()
+    return int(v) if v.isdigit() else None
+
+def _get_list(row: Dict[str,str], key: str) -> List[str]:
+    # tolerant: return [] if column not present
+    if key in row:
+        return to_list(row.get(key,""))
+    return []
+
+def _read_keywords_csv_rich(csv_path: str) -> QuerySpec:
+    with open(csv_path, "r", encoding="utf-8") as f:
+        last = list(csv.DictReader(f))[-1]  # take most recent row
+    return QuerySpec(
+        run_id = last.get("run_id","").strip(),
+        boolean_queries = to_list(last.get("boolean_queries|;|","")),
+        seed_terms = to_list(last.get("seed_terms|;|","")),
+        expanded_terms = to_list(last.get("expanded_terms|;|","")),
+        years_from = _to_int_or_none(last.get("years_from")),
+        years_to = _to_int_or_none(last.get("years_to")),
+        must_phrases = _get_list(last, "must_phrases|;|"),
+        any_phrases = _get_list(last, "any_phrases|;|"),
+        exclude_terms = _get_list(last, "exclude_terms|;|"),
+        title_bias_terms = _get_list(last, "title_bias_terms|;|"),
+        domains = _get_list(last, "domains|;|"),
+        doc_types = _get_list(last, "doc_types|;|"),
+        venues = _get_list(last, "venues|;|"),
+    )
+
+def _phrase(s: str) -> str:
+    s = s.strip()
+    if not s: return s
+    # keep existing quotes; else quote multi-word phrases
+    return s if (s.startswith('"') and s.endswith('"')) or (" " not in s) else f'"{s}"'
+
+def _chunk(lst: List[str], n: int) -> List[List[str]]:
+    # chunk list into groups of n (for micro-queries)
+    return [lst[i:i+n] for i in range(0, len(lst), n)]
+
+# === Engine-specific query sanitizers ===
+_BOOL_OP = re.compile(r'\b(AND|OR|NOT)\b', re.I)
+
+def _strip_label_and_parens(q: str) -> str:
+    """Drop a leading [Label] and outer parens; keep quotes; collapse whitespace."""
+    if not q: return q
+    q = re.sub(r'^\s*\[[^\]]+\]\s*', '', q).strip()
+    # remove a single pair of wrapping parentheses if they wrap the whole string
+    if q.startswith("(") and q.endswith(")"):
+        # only if balanced at top-level
+        depth=0; balanced=True
+        for i,ch in enumerate(q):
+            if ch=="(":
+                depth+=1
+            elif ch==")":
+                depth-=1
+                if depth<0: balanced=False; break
+            if i<len(q)-1 and depth==0 and i!=len(q)-2:
+                balanced=False
+        if balanced:
+            q = q[1:-1].strip()
+    return re.sub(r'\s+', ' ', q).strip()
+
+def _bag_of_words(q: str) -> str:
+    """Remove boolean/parens → space-separated terms, keep quoted phrases."""
+    if not q: return q
+    s = _strip_label_and_parens(q)
+    s = _BOOL_OP.sub(' ', s)
+    s = re.sub(r'[()]', ' ', s)
+    s = re.sub(r'\s+', ' ', s).strip()
+    return s
+
+def _trim_len(s: str, max_len: int = 300) -> str:
+    """APIs like OpenAlex/S2 tolerate ~200-500 chars. Trim politely."""
+    if not s or len(s) <= max_len: return s
+    return s[:max_len].rstrip()
+
+
 def _read_keywords_csv(csv_path: str) -> Dict[str, List[str]]:
     with open(csv_path, "r", encoding="utf-8") as f:
         row = list(csv.DictReader(f))[-1]  # take most recent
@@ -353,19 +598,19 @@ def run(
 
     # Read CSV-1 and guarantee we have a run_id even if CSV-1 read fails
     try:
-        meta = _read_keywords_csv(csv1_path)
+        spec = _read_keywords_csv_rich(csv1_path)
     except Exception as e:
-        # fallback run_id so we still create output folders and write files
         fallback_run_id = datetime.datetime.utcnow().strftime("run_%Y%m%d_%H%M%S")
         print(f"[warn] Failed to read CSV-1: {e} — continuing with fallback run_id={fallback_run_id}")
-        meta = {"run_id": fallback_run_id, "boolean_queries": []}
+        spec = QuerySpec(run_id=fallback_run_id, boolean_queries=[], seed_terms=[], expanded_terms=[])
 
-    run_id = (meta.get("run_id") or "").strip()
+
+    run_id = (spec.run_id or "").strip()
     if not run_id:
         run_id = datetime.datetime.utcnow().strftime("run_%Y%m%d_%H%M%S")
         print(f"[warn] Empty run_id in CSV-1 — using fallback run_id={run_id}")
 
-    qs = meta.get("boolean_queries") or []
+    qs = spec.boolean_queries or []
 
     if not qs:
         return False, "No boolean queries found in CSV-1."
@@ -395,6 +640,30 @@ def run(
         except Exception as e:
             print(f"[io] could not create output dir for {key}: {e}")
 
+
+    # Create a fresh, unique subfolder per invocation to avoid overwrites.
+    # Example: runs/<run_id>/attempt_2025-10-21_15-03-42
+    attempt_stamp = datetime.datetime.utcnow().strftime("attempt_%Y-%m-%d_%H-%M-%S")
+    for key in ("csv", "raw", "logs"):
+        # Re-root each path into a unique attempt folder
+        base_dir = paths[key]
+        unique_dir = os.path.join(base_dir, attempt_stamp)
+        try:
+            os.makedirs(unique_dir, exist_ok=True)
+            paths[key] = unique_dir
+        except Exception as e:
+            print(f"[io] could not create unique attempt dir for {key}: {e}")
+    _dbg(f"Writing outputs to unique attempt folder: csv={paths['csv']} raw={paths['raw']} logs={paths['logs']}")
+
+
+    queries_log_path = os.path.join(paths["logs"], "queries_emitted.log")
+    results_log_path = os.path.join(paths["logs"], "results_summary.log")
+
+    stop_flag_path = os.path.join(paths["logs"], "STOP")
+    # expose to GUI so a Stop button can touch the file
+    try: os.environ["LIT_STOP_FLAG_PATH"] = stop_flag_path
+    except Exception: pass
+
     out_csv = os.path.join(paths["csv"], "search_results_raw.csv")
 
     # Streaming (append-as-we-go) file for progress monitoring (non-deduped)
@@ -410,6 +679,9 @@ def run(
 
     engine_counts = defaultdict(int)
     engine_errors = defaultdict(int)
+
+    engine_attempts = defaultdict(int)
+    engine_success = defaultdict(int)
 
     # checkpoint controls (env overrideable)
     try:
@@ -492,161 +764,256 @@ def run(
     # ---- Approval gate (network-only; NO LLM TOKENS) -------------------------
     def _collect():
         nonlocal collected, since_last_cp
-        for q in qs:
+
+        if _should_stop(stop_flag_path):
+            _dbg("Stop requested before collection started; exiting early.")
+            return True
+
+        # helper to write queries to a log file so we can inspect real requests
+        def _log_query(engine: str, q: str):
+            try:
+                with open(queries_log_path, "a", encoding="utf-8") as lf:
+                    lf.write(f"[{engine}] {q}\n")
+            except Exception:
+                pass
+
+        for base_q in qs:
             term_origin = "seed/expanded-mix"
+
+            # Normalize a base query once; planners will customize further.
+            base_q_clean = _strip_label_and_parens(base_q)
+
             if "OpenAlex" in engines:
                 try:
-                    q_simple = _simplify_boolean(q)
+                    engine = "OpenAlex"
                     new_rows: List[Dict[str,str]] = []
+                    for q in _plan_queries_for_engine(engine, spec, base_q_clean):
+                        if _should_stop(stop_flag_path): break
 
-                    # Simple first
-                    r1 = SRC.search_openalex(
-                        run_id, q_simple, term_origin,
-                        per_page=min(per_source, 25),
-                        max_pages=_max_pages("OpenAlex")
-                    )
-                    r1 = _force_engine(r1, "OpenAlex")
-                    new_rows += r1 or []
+                        if len(new_rows) >= per_source: break
+                        _log_query(engine, q)
+                        engine_attempts[engine] += 1
+                        t0 = time.time()
+                        try:
+                            r = SRC.search_openalex(
+                                run_id, q, term_origin,
+                                per_page=min(per_source - len(new_rows), 25),
+                                max_pages=_max_pages("OpenAlex")
+                            )
+                            n = len(r or [])
+                            secs = time.time() - t0
+                            _write_log_line(results_log_path, f"[{engine}] OK | {n} rows | {secs:.2f}s | {q}")
+                            _dbg(f"{engine} OK {n} rows in {secs:.2f}s :: {q}")
+                            engine_success[engine] += 1
+                        except Exception as e:
+                            secs = time.time() - t0
+                            _write_log_line(results_log_path, f"[{engine}] ERR | 0 rows | {secs:.2f}s | {q} | {type(e).__name__}: {e}")
+                            _dbg(f"{engine} ERR {secs:.2f}s :: {type(e).__name__}: {e} :: {q}")
+                            r = None
 
-                    # Then try the original boolean if we want more
-                    if len(new_rows) < per_source:
-                        r2 = SRC.search_openalex(
-                            run_id, q, term_origin,
-                            per_page=min(per_source - len(new_rows), 25),
-                            max_pages=_max_pages("OpenAlex")
-                        )
-                        r2 = _force_engine(r2, "OpenAlex")
-                        new_rows += r2 or []
-
+                        r = _force_engine(r, engine)
+                        new_rows += (r or [])
                     new_rows = [_normalize_row(r) for r in (new_rows or [])]
                     collected += new_rows
-                    engine_counts["OpenAlex"] += len(new_rows)
+                    engine_counts[engine] += len(new_rows)
                     if new_rows:
                         _write_csv2(out_partial, new_rows)
                         since_last_cp += len(new_rows)
                         _maybe_checkpoint(False)
-                    print(f"[collect] OpenAlex: +{len(new_rows)} (simple→boolean).")
+                    print(f"[collect] {engine}: +{len(new_rows)} (planned queries).")
+                    if _should_stop(stop_flag_path):
+                        _dbg(f"Stop requested after {engine} block; exiting early.")
+                        return True
 
                 except Exception as e:
                     engine_errors["OpenAlex"] += 1
                     print(f"[collect][OpenAlex] error: {e}")
 
-
             if "Crossref" in engines:
                 try:
-                    q_simple = _simplify_boolean(q)
+                    engine = "Crossref"
                     new_rows: List[Dict[str,str]] = []
+                    for q in _plan_queries_for_engine(engine, spec, base_q_clean):
+                        if _should_stop(stop_flag_path): break
 
-                    # Simple first (Crossref can handle boolean too, but simple boosts recall)
-                    r1 = SRC.search_crossref(run_id, q_simple, term_origin, rows=min(per_source, 50))
-                    r1 = _force_engine(r1, "Crossref")
-                    new_rows += r1 or []
+                        if len(new_rows) >= per_source: break
+                        _log_query(engine, q)
+                        engine_attempts[engine] += 1
+                        t0 = time.time()
+                        try:
+                            r = SRC.search_crossref(
+                                run_id, q, term_origin,
+                                rows=min(per_source - len(new_rows), 50)
+                            )
+                            n = len(r or [])
+                            secs = time.time() - t0
+                            _write_log_line(results_log_path, f"[{engine}] OK | {n} rows | {secs:.2f}s | {q}")
+                            _dbg(f"{engine} OK {n} rows in {secs:.2f}s :: {q}")
+                            engine_success[engine] += 1
+                        except Exception as e:
+                            secs = time.time() - t0
+                            _write_log_line(results_log_path, f"[{engine}] ERR | 0 rows | {secs:.2f}s | {q} | {type(e).__name__}: {e}")
+                            _dbg(f"{engine} ERR {secs:.2f}s :: {type(e).__name__}: {e} :: {q}")
+                            r = None
 
-                    if len(new_rows) < per_source:
-                        r2 = SRC.search_crossref(run_id, q, term_origin, rows=min(per_source - len(new_rows), 50))
-                        r2 = _force_engine(r2, "Crossref")
-                        new_rows += r2 or []
-
+                        r = _force_engine(r, engine)
+                        new_rows += (r or [])
                     new_rows = [_normalize_row(r) for r in (new_rows or [])]
                     collected += new_rows
-                    engine_counts["Crossref"] += len(new_rows)
+                    engine_counts[engine] += len(new_rows)
                     if new_rows:
                         _write_csv2(out_partial, new_rows)
                         since_last_cp += len(new_rows)
                         _maybe_checkpoint(False)
-                    print(f"[collect] Crossref: +{len(new_rows)} (simple→boolean).")
+                    print(f"[collect] {engine}: +{len(new_rows)} (planned queries).")
+                    if _should_stop(stop_flag_path):
+                        _dbg(f"Stop requested after {engine} block; exiting early.")
+                        return True
 
                 except Exception as e:
                     engine_errors["Crossref"] += 1
                     print(f"[collect][Crossref] error: {e}")
 
-
             if "arXiv" in engines:
                 try:
-                    q_simple = _simplify_boolean(q)  # arXiv dislikes complex booleans
+                    engine = "arXiv"
                     new_rows: List[Dict[str,str]] = []
+                    # IMPORTANT: do NOT simplify; use planner output
+                    for q in _plan_queries_for_engine(engine, spec, base_q_clean):
+                        if _should_stop(stop_flag_path): break
 
-                    r1 = SRC.search_arxiv(run_id, q_simple, term_origin, max_results=min(per_source, 50))
-                    r1 = _force_engine(r1, "arXiv")
-                    new_rows += r1 or []
+                        if len(new_rows) >= per_source: break
+                        _log_query(engine, q)
+                        engine_attempts[engine] += 1
+                        t0 = time.time()
+                        try:
+                            r = SRC.search_arxiv(
+                                run_id, q, term_origin,
+                                max_results=min(per_source - len(new_rows), 50)
+                            )
+                            n = len(r or [])
+                            secs = time.time() - t0
+                            _write_log_line(results_log_path, f"[{engine}] OK | {n} rows | {secs:.2f}s | {q}")
+                            _dbg(f"{engine} OK {n} rows in {secs:.2f}s :: {q}")
+                            engine_success[engine] += 1
+                        except Exception as e:
+                            secs = time.time() - t0
+                            _write_log_line(results_log_path, f"[{engine}] ERR | 0 rows | {secs:.2f}s | {q} | {type(e).__name__}: {e}")
+                            _dbg(f"{engine} ERR {secs:.2f}s :: {type(e).__name__}: {e} :: {q}")
+                            r = None
 
-                    if len(new_rows) < per_source:
-                        # Try original text in case some phrases happen to work
-                        r2 = SRC.search_arxiv(run_id, q, term_origin, max_results=min(per_source - len(new_rows), 50))
-                        r2 = _force_engine(r2, "arXiv")
-                        new_rows += r2 or []
-
+                        r = _force_engine(r, engine)
+                        new_rows += (r or [])
                     new_rows = [_normalize_row(r) for r in (new_rows or [])]
                     collected += new_rows
-                    engine_counts["arXiv"] += len(new_rows)
+                    engine_counts[engine] += len(new_rows)
                     if new_rows:
                         _write_csv2(out_partial, new_rows)
                         since_last_cp += len(new_rows)
                         _maybe_checkpoint(False)
-                    print(f"[collect] arXiv: +{len(new_rows)} (simple→boolean).")
+                    print(f"[collect] {engine}: +{len(new_rows)} (planned queries).")
+                    if _should_stop(stop_flag_path):
+                        _dbg(f"Stop requested after {engine} block; exiting early.")
+                        return True
 
                 except Exception as e:
                     engine_errors["arXiv"] += 1
                     print(f"[collect][arXiv] error: {e}")
 
-
             if "PubMed" in engines:
                 try:
-                    q_simple = _simplify_boolean(q)  # PubMed ESearch: bag-of-words performs better
+                    engine = "PubMed"
                     new_rows: List[Dict[str,str]] = []
+                    # IMPORTANT: do NOT simplify; use planner output with field tags
+                    for q in _plan_queries_for_engine(engine, spec, base_q_clean):
+                        if _should_stop(stop_flag_path): break
 
-                    r1 = SRC.search_pubmed(run_id, q_simple, term_origin, retmax=min(per_source, 50))
-                    r1 = _force_engine(r1, "PubMed")
-                    new_rows += r1 or []
+                        if len(new_rows) >= per_source: break
+                        _log_query(engine, q)
+                        _log_query(engine, q)
+                        engine_attempts[engine] += 1
+                        t0 = time.time()
+                        try:
+                            r = SRC.search_pubmed(
+                                run_id, q, term_origin,
+                                retmax=min(per_source - len(new_rows), 50)
+                            )
+                            n = len(r or [])
+                            secs = time.time() - t0
+                            _write_log_line(results_log_path, f"[{engine}] OK | {n} rows | {secs:.2f}s | {q}")
+                            _dbg(f"{engine} OK {n} rows in {secs:.2f}s :: {q}")
+                            engine_success[engine] += 1
+                        except Exception as e:
+                            secs = time.time() - t0
+                            _write_log_line(results_log_path, f"[{engine}] ERR | 0 rows | {secs:.2f}s | {q} | {type(e).__name__}: {e}")
+                            _dbg(f"{engine} ERR {secs:.2f}s :: {type(e).__name__}: {e} :: {q}")
+                            r = None
 
-                    if len(new_rows) < per_source:
-                        r2 = SRC.search_pubmed(run_id, q, term_origin, retmax=min(per_source - len(new_rows), 50))
-                        r2 = _force_engine(r2, "PubMed")
-                        new_rows += r2 or []
-
+                        r = _force_engine(r, engine)
+                        new_rows += (r or [])
                     new_rows = [_normalize_row(r) for r in (new_rows or [])]
                     collected += new_rows
-                    engine_counts["PubMed"] += len(new_rows)
+                    engine_counts[engine] += len(new_rows)
                     if new_rows:
                         _write_csv2(out_partial, new_rows)
                         since_last_cp += len(new_rows)
                         _maybe_checkpoint(False)
-                    print(f"[collect] PubMed: +{len(new_rows)} (simple→boolean).")
+                    print(f"[collect] {engine}: +{len(new_rows)} (planned queries).")
+                    if _should_stop(stop_flag_path):
+                        _dbg(f"Stop requested after {engine} block; exiting early.")
+                        return True
 
                 except Exception as e:
                     engine_errors["PubMed"] += 1
                     print(f"[collect][PubMed] error: {e}")
 
-
             if "SemanticScholar" in engines:
                 try:
-                    q_simple = _simplify_boolean(q)
+                    engine = "SemanticScholar"
                     new_rows: List[Dict[str,str]] = []
+                    for q in _plan_queries_for_engine(engine, spec, base_q_clean):
+                        if _should_stop(stop_flag_path): break
 
-                    r1 = SRC.search_semantic_scholar(run_id, q_simple, term_origin, limit=min(per_source, 50))
-                    r1 = _force_engine(r1, "SemanticScholar")
-                    new_rows += r1 or []
+                        if len(new_rows) >= per_source: break
+                        _log_query(engine, q)
+                        engine_attempts[engine] += 1
+                        t0 = time.time()
+                        try:
+                            r = SRC.search_semantic_scholar(
+                                run_id, q, term_origin,
+                                limit=min(per_source - len(new_rows), 50)
+                            )
+                            n = len(r or [])
+                            secs = time.time() - t0
+                            _write_log_line(results_log_path, f"[{engine}] OK | {n} rows | {secs:.2f}s | {q}")
+                            _dbg(f"{engine} OK {n} rows in {secs:.2f}s :: {q}")
+                            engine_success[engine] += 1
+                        except Exception as e:
+                            secs = time.time() - t0
+                            _write_log_line(results_log_path, f"[{engine}] ERR | 0 rows | {secs:.2f}s | {q} | {type(e).__name__}: {e}")
+                            _dbg(f"{engine} ERR {secs:.2f}s :: {type(e).__name__}: {e} :: {q}")
+                            r = None
 
-                    if len(new_rows) < per_source:
-                        r2 = SRC.search_semantic_scholar(run_id, q, term_origin, limit=min(per_source - len(new_rows), 50))
-                        r2 = _force_engine(r2, "SemanticScholar")
-                        new_rows += r2 or []
-
+                        r = _force_engine(r, engine)
+                        new_rows += (r or [])
                     new_rows = [_normalize_row(r) for r in (new_rows or [])]
                     collected += new_rows
-                    engine_counts["SemanticScholar"] += len(new_rows)
+                    engine_counts[engine] += len(new_rows)
                     if new_rows:
                         _write_csv2(out_partial, new_rows)
                         since_last_cp += len(new_rows)
                         _maybe_checkpoint(False)
-                    print(f"[collect] SemanticScholar: +{len(new_rows)} (simple→boolean).")
+                    print(f"[collect] {engine}: +{len(new_rows)} (planned queries).")
+                    if _should_stop(stop_flag_path):
+                        _dbg(f"Stop requested after {engine} block; exiting early.")
+                        return True
 
                 except Exception as e:
                     engine_errors["SemanticScholar"] += 1
                     print(f"[collect][SemanticScholar] error: {e}")
 
-
         return True
+
 
     # Make the approval description explicit: no LLM spend; show scale
     req_count = len(qs) * len(engines)
@@ -700,6 +1067,18 @@ def run(
     try:
         total = sum(engine_counts.values())
         print("[summary] Engine totals:", dict(engine_counts), "grand_total:", total)
+
+        try:
+            attempts = dict(engine_attempts)
+            success = dict(engine_success)
+            failures = {k: attempts.get(k, 0) - success.get(k, 0) for k in attempts.keys()}
+            print("[summary] Engine attempts:", attempts)
+            print("[summary] Engine success:", success)
+            print("[summary] Engine failures:", failures)
+        except Exception:
+            pass
+
+
         if any(engine_errors.values()):
             print("[summary] Engine errors:", dict(engine_errors))
     except Exception:

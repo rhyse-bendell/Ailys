@@ -170,10 +170,20 @@ class AilysGUI(QWidget):
         btn_row.addWidget(self.btn_refresh_approvals)
         right_layout.addLayout(btn_row)
 
+        # Stop control row
+        stop_row = QHBoxLayout()
+        self.btn_stop_task = QPushButton("Stop Current Task")
+        self.btn_stop_task.setToolTip("Sends a soft STOP signal (env + STOP file if available). The task will checkpoint and finalize.")
+        stop_row.addWidget(self.btn_stop_task)
+        right_layout.addLayout(stop_row)
+
+
         # Wire actions to handlers (defined below)
         self.btn_refresh_approvals.clicked.connect(self.refresh_approvals_pane)
         self.btn_approve_selected.clicked.connect(self.approve_selected_request)
         self.btn_deny_selected.clicked.connect(self.deny_selected_request)
+
+        self.btn_stop_task.clicked.connect(self.stop_current_task)
 
         # Add to the main layout with smaller stretch
         main_layout.addWidget(right_panel, 1)
@@ -400,6 +410,33 @@ class AilysGUI(QWidget):
         except Exception as e:
             self.chat_log.append(f"❌ Deny error: {e}")
             self.refresh_approvals_pane()
+
+    def stop_current_task(self):
+        """
+        Sends a cooperative stop signal to running tasks that honor:
+          - env var LIT_STOP=1
+          - STOP file at path given by env var LIT_STOP_FLAG_PATH
+        """
+        try:
+            os.environ["LIT_STOP"] = "1"
+            stop_hint = os.environ.get("LIT_STOP_FLAG_PATH", "").strip()
+            made_file = False
+            if stop_hint:
+                try:
+                    # Ensure parent dir then create/touch the STOP file
+                    os.makedirs(os.path.dirname(stop_hint) or ".", exist_ok=True)
+                    with open(stop_hint, "a", encoding="utf-8") as f:
+                        f.write("STOP\n")
+                    made_file = True
+                except Exception as e:
+                    self.chat_log.append(f"⚠️ Could not create STOP file at {stop_hint}: {e}")
+            msg = "🛑 Stop signal sent (env)."
+            if made_file:
+                msg += f" STOP file touched at: {stop_hint}"
+            self.chat_log.append(msg)
+        except Exception as e:
+            self.chat_log.append(f"❌ Stop failed: {e}")
+
 
     def check_approval_notifications(self):
         pending = approvals.approval_queue.get_pending_requests()
