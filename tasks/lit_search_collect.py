@@ -244,16 +244,54 @@ def _force_engine(rows, engine_name: str):
             r["engine"] = engine_name
     return rows
 
+def _normalize_doi(doi: str | None) -> str:
+    if not doi:
+        return ""
+    d = doi.strip()
+    d = re.sub(r"^https?://(dx\.)?doi\.org/", "", d, flags=re.I)
+    return d.lower()
+
+def _normalize_row(r: Dict[str, str]) -> Dict[str, str]:
+    # Normalize common fields to reduce dupes + weird chars
+    r = dict(r)
+    r["title"] = _clean_text(r.get("title", ""))
+    r["venue"] = _clean_text(r.get("venue", ""))
+    r["abstract"] = _clean_text(r.get("abstract", ""))
+    r["authors|;|"] = _clean_text(r.get("authors|;|", ""))
+    r["doi"] = _normalize_doi(r.get("doi"))
+    # Trim url whitespace/control chars but don't over-process
+    url = (r.get("url") or "").strip()
+    url = re.sub(r"[\x00-\x1F\x7F]", "", url)
+    r["url"] = url
+    return r
+
+def _max_pages(engine: str) -> int:
+    # Allow engine-specific override, else global, else 10
+    eng_key = f"LIT_{engine.upper()}_MAX_PAGES"
+    try:
+        if os.getenv(eng_key):
+            return int(os.getenv(eng_key))
+        if os.getenv("LIT_MAX_PAGES"):
+            return int(os.getenv("LIT_MAX_PAGES"))
+    except Exception:
+        pass
+    return 10
+
 
 def _ensure_csv2_header(path: str):
     """
-    Create the CSV file with header if it doesn't exist yet.
+    Create the CSV file with header if it doesn't exist yet, and create parent dir.
     """
+    try:
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    except Exception as e:
+        print(f"[io] mkdirs for {path} failed: {e}")
     if os.path.exists(path):
         return
     with open(path, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=CSV2_HEADER, extrasaction="ignore")
         w.writeheader()
+
 
 CSV2_HEADER = [
     "run_id","engine","query","term_origin","work_id","title","authors|;|",
@@ -283,29 +321,26 @@ def _dedupe(rows: List[Dict[str,str]]) -> List[Dict[str,str]]:
     seen = set()
     out = []
     for r in rows:
-        doi = (r.get("doi") or "").lower().strip()
-        title = _clean_text(r.get("title", "")).lower()
+        r = _normalize_row(r)
+        doi = r["doi"]
+        title = r["title"].lower()
         year = (r.get("year", "") or "").strip()
         if doi:
             key = f"doi::{doi}"
         else:
-            # fall back to normalized title+year
             key = f"title::{title}::{year}"
         if key in seen:
             continue
         seen.add(key)
-        # also normalize the stored fields to avoid weird chars in the final CSV
-        r["title"] = _clean_text(r.get("title", ""))
-        r["venue"] = _clean_text(r.get("venue", ""))
-        r["abstract"] = _clean_text(r.get("abstract", ""))
         out.append(r)
     return out
+
 
 
 def run(
     csv1_path: str,
     researcher: Optional[str] = None,
-    per_source: int = 20,
+    per_source: int = 500,
     include: Optional[List[str]] = None
 ):
     """
@@ -316,9 +351,21 @@ def run(
     if not os.path.exists(csv1_path):
         return False, f"CSV-1 not found: {csv1_path}"
 
-    meta = _read_keywords_csv(csv1_path)
-    run_id = meta["run_id"]
-    qs = meta["boolean_queries"]
+    # Read CSV-1 and guarantee we have a run_id even if CSV-1 read fails
+    try:
+        meta = _read_keywords_csv(csv1_path)
+    except Exception as e:
+        # fallback run_id so we still create output folders and write files
+        fallback_run_id = datetime.datetime.utcnow().strftime("run_%Y%m%d_%H%M%S")
+        print(f"[warn] Failed to read CSV-1: {e} — continuing with fallback run_id={fallback_run_id}")
+        meta = {"run_id": fallback_run_id, "boolean_queries": []}
+
+    run_id = (meta.get("run_id") or "").strip()
+    if not run_id:
+        run_id = datetime.datetime.utcnow().strftime("run_%Y%m%d_%H%M%S")
+        print(f"[warn] Empty run_id in CSV-1 — using fallback run_id={run_id}")
+
+    qs = meta.get("boolean_queries") or []
 
     if not qs:
         return False, "No boolean queries found in CSV-1."
@@ -334,8 +381,20 @@ def run(
                            '  & "C:\\Post-doc Work\\Ailys\\venv\\Scripts\\python.exe" -m pip install requests')
         return False, f"Could not import search sources: {msg}"
 
+    paths = run_dirs(run_id) or {}
+    # Hard fallback if the helper failed or returned blanks
+    default_root = os.path.join(os.getcwd(), "runs", run_id)
+    paths.setdefault("csv", os.path.join(default_root, "csv"))
+    paths.setdefault("raw", os.path.join(default_root, "raw"))
+    paths.setdefault("logs", os.path.join(default_root, "logs"))
 
-    paths = run_dirs(run_id)
+    # ensure dirs
+    for key in ("csv", "raw", "logs"):
+        try:
+            os.makedirs(paths[key], exist_ok=True)
+        except Exception as e:
+            print(f"[io] could not create output dir for {key}: {e}")
+
     out_csv = os.path.join(paths["csv"], "search_results_raw.csv")
 
     # Streaming (append-as-we-go) file for progress monitoring (non-deduped)
@@ -351,6 +410,34 @@ def run(
 
     engine_counts = defaultdict(int)
     engine_errors = defaultdict(int)
+
+    # checkpoint controls (env overrideable)
+    try:
+        _CP_ROWS = max(1, int(os.getenv("LIT_CHECKPOINT_ROWS", "200")))
+    except Exception:
+        _CP_ROWS = 200
+    try:
+        _CP_SEC = max(5, int(os.getenv("LIT_CHECKPOINT_SEC", "60")))
+    except Exception:
+        _CP_SEC = 60
+
+    last_cp_ts = time.time()
+    since_last_cp = 0
+
+    def _maybe_checkpoint(force: bool = False):
+        nonlocal last_cp_ts, since_last_cp
+        now = time.time()
+        if force or (since_last_cp >= _CP_ROWS) or ((now - last_cp_ts) >= _CP_SEC):
+            # Write a deduped snapshot to a checkpoint file and ensure final file exists
+            try:
+                snapshot = _dedupe(collected)
+                cp_path = os.path.join(paths["csv"], "search_results_raw.checkpoint.csv")
+                _write_csv2(cp_path, snapshot)
+            except Exception as e:
+                print(f"[checkpoint] failed: {e}")
+            last_cp_ts = now
+            since_last_cp = 0
+
 
     # Helpful hints if missing identifiers (some APIs throttle or behave oddly)
     if not (os.getenv("OPENALEX_EMAIL", "").strip()):
@@ -404,118 +491,160 @@ def run(
 
     # ---- Approval gate (network-only; NO LLM TOKENS) -------------------------
     def _collect():
-        nonlocal collected
+        nonlocal collected, since_last_cp
         for q in qs:
             term_origin = "seed/expanded-mix"
             if "OpenAlex" in engines:
                 try:
-                    primary_rows = SRC.search_openalex(run_id, q, term_origin, per_page=min(per_source, 25), max_pages=1)
-                    primary_rows = _force_engine(primary_rows, "OpenAlex")
-                    if not primary_rows:
-                        q2 = _simplify_boolean(q)
-                        fallback_rows = SRC.search_openalex(run_id, q2, term_origin, per_page=min(per_source, 25), max_pages=1)
-                        fallback_rows = _force_engine(fallback_rows, "OpenAlex")
-                        got = len(fallback_rows)
-                        if got:
-                            print(f"[collect] OpenAlex fallback hit {got} using simplified query.")
-                        new_rows = fallback_rows
-                    else:
-                        new_rows = primary_rows
+                    q_simple = _simplify_boolean(q)
+                    new_rows: List[Dict[str,str]] = []
+
+                    # Simple first
+                    r1 = SRC.search_openalex(
+                        run_id, q_simple, term_origin,
+                        per_page=min(per_source, 25),
+                        max_pages=_max_pages("OpenAlex")
+                    )
+                    r1 = _force_engine(r1, "OpenAlex")
+                    new_rows += r1 or []
+
+                    # Then try the original boolean if we want more
+                    if len(new_rows) < per_source:
+                        r2 = SRC.search_openalex(
+                            run_id, q, term_origin,
+                            per_page=min(per_source - len(new_rows), 25),
+                            max_pages=_max_pages("OpenAlex")
+                        )
+                        r2 = _force_engine(r2, "OpenAlex")
+                        new_rows += r2 or []
+
+                    new_rows = [_normalize_row(r) for r in (new_rows or [])]
                     collected += new_rows
                     engine_counts["OpenAlex"] += len(new_rows)
-                    _write_csv2(out_partial, new_rows)
-                    print(f"[collect] OpenAlex: +{len(new_rows)} for this query.")
+                    if new_rows:
+                        _write_csv2(out_partial, new_rows)
+                        since_last_cp += len(new_rows)
+                        _maybe_checkpoint(False)
+                    print(f"[collect] OpenAlex: +{len(new_rows)} (simple→boolean).")
+
                 except Exception as e:
                     engine_errors["OpenAlex"] += 1
                     print(f"[collect][OpenAlex] error: {e}")
 
+
             if "Crossref" in engines:
                 try:
-                    primary_rows = SRC.search_crossref(run_id, q, term_origin, rows=min(per_source, 20))
-                    primary_rows = _force_engine(primary_rows, "Crossref")
-                    if not primary_rows:
-                        q2 = _simplify_boolean(q)
-                        fallback_rows = SRC.search_crossref(run_id, q2, term_origin, rows=min(per_source, 20))
-                        fallback_rows = _force_engine(fallback_rows, "Crossref")
-                        got = len(fallback_rows)
-                        if got:
-                            print(f"[collect] Crossref fallback hit {got} using simplified query.")
-                        new_rows = fallback_rows
-                    else:
-                        new_rows = primary_rows
+                    q_simple = _simplify_boolean(q)
+                    new_rows: List[Dict[str,str]] = []
+
+                    # Simple first (Crossref can handle boolean too, but simple boosts recall)
+                    r1 = SRC.search_crossref(run_id, q_simple, term_origin, rows=min(per_source, 50))
+                    r1 = _force_engine(r1, "Crossref")
+                    new_rows += r1 or []
+
+                    if len(new_rows) < per_source:
+                        r2 = SRC.search_crossref(run_id, q, term_origin, rows=min(per_source - len(new_rows), 50))
+                        r2 = _force_engine(r2, "Crossref")
+                        new_rows += r2 or []
+
+                    new_rows = [_normalize_row(r) for r in (new_rows or [])]
                     collected += new_rows
                     engine_counts["Crossref"] += len(new_rows)
-                    _write_csv2(out_partial, new_rows)
-                    print(f"[collect] Crossref: +{len(new_rows)} for this query.")
+                    if new_rows:
+                        _write_csv2(out_partial, new_rows)
+                        since_last_cp += len(new_rows)
+                        _maybe_checkpoint(False)
+                    print(f"[collect] Crossref: +{len(new_rows)} (simple→boolean).")
+
                 except Exception as e:
                     engine_errors["Crossref"] += 1
                     print(f"[collect][Crossref] error: {e}")
 
+
             if "arXiv" in engines:
                 try:
-                    primary_rows = SRC.search_arxiv(run_id, q, term_origin, max_results=min(per_source, 25))
-                    primary_rows = _force_engine(primary_rows, "arXiv")
-                    if not primary_rows:
-                        q2 = _simplify_boolean(q)
-                        fallback_rows = SRC.search_arxiv(run_id, q2, term_origin, max_results=min(per_source, 25))
-                        fallback_rows = _force_engine(fallback_rows, "arXiv")
-                        got = len(fallback_rows)
-                        if got:
-                            print(f"[collect] arXiv fallback hit {got} using simplified query.")
-                        new_rows = fallback_rows
-                    else:
-                        new_rows = primary_rows
+                    q_simple = _simplify_boolean(q)  # arXiv dislikes complex booleans
+                    new_rows: List[Dict[str,str]] = []
+
+                    r1 = SRC.search_arxiv(run_id, q_simple, term_origin, max_results=min(per_source, 50))
+                    r1 = _force_engine(r1, "arXiv")
+                    new_rows += r1 or []
+
+                    if len(new_rows) < per_source:
+                        # Try original text in case some phrases happen to work
+                        r2 = SRC.search_arxiv(run_id, q, term_origin, max_results=min(per_source - len(new_rows), 50))
+                        r2 = _force_engine(r2, "arXiv")
+                        new_rows += r2 or []
+
+                    new_rows = [_normalize_row(r) for r in (new_rows or [])]
                     collected += new_rows
                     engine_counts["arXiv"] += len(new_rows)
-                    _write_csv2(out_partial, new_rows)
-                    print(f"[collect] arXiv: +{len(new_rows)} for this query.")
+                    if new_rows:
+                        _write_csv2(out_partial, new_rows)
+                        since_last_cp += len(new_rows)
+                        _maybe_checkpoint(False)
+                    print(f"[collect] arXiv: +{len(new_rows)} (simple→boolean).")
+
                 except Exception as e:
                     engine_errors["arXiv"] += 1
                     print(f"[collect][arXiv] error: {e}")
 
+
             if "PubMed" in engines:
                 try:
-                    primary_rows = SRC.search_pubmed(run_id, q, term_origin, retmax=min(per_source, 20))
-                    primary_rows = _force_engine(primary_rows, "PubMed")
-                    if not primary_rows:
-                        q2 = _simplify_boolean(q)
-                        fallback_rows = SRC.search_pubmed(run_id, q2, term_origin, retmax=min(per_source, 20))
-                        fallback_rows = _force_engine(fallback_rows, "PubMed")
-                        got = len(fallback_rows)
-                        if got:
-                            print(f"[collect] PubMed fallback hit {got} using simplified query.")
-                        new_rows = fallback_rows
-                    else:
-                        new_rows = primary_rows
+                    q_simple = _simplify_boolean(q)  # PubMed ESearch: bag-of-words performs better
+                    new_rows: List[Dict[str,str]] = []
+
+                    r1 = SRC.search_pubmed(run_id, q_simple, term_origin, retmax=min(per_source, 50))
+                    r1 = _force_engine(r1, "PubMed")
+                    new_rows += r1 or []
+
+                    if len(new_rows) < per_source:
+                        r2 = SRC.search_pubmed(run_id, q, term_origin, retmax=min(per_source - len(new_rows), 50))
+                        r2 = _force_engine(r2, "PubMed")
+                        new_rows += r2 or []
+
+                    new_rows = [_normalize_row(r) for r in (new_rows or [])]
                     collected += new_rows
                     engine_counts["PubMed"] += len(new_rows)
-                    _write_csv2(out_partial, new_rows)
-                    print(f"[collect] PubMed: +{len(new_rows)} for this query.")
+                    if new_rows:
+                        _write_csv2(out_partial, new_rows)
+                        since_last_cp += len(new_rows)
+                        _maybe_checkpoint(False)
+                    print(f"[collect] PubMed: +{len(new_rows)} (simple→boolean).")
+
                 except Exception as e:
                     engine_errors["PubMed"] += 1
                     print(f"[collect][PubMed] error: {e}")
 
+
             if "SemanticScholar" in engines:
                 try:
-                    primary_rows = SRC.search_semantic_scholar(run_id, q, term_origin, limit=min(per_source, 20))
-                    primary_rows = _force_engine(primary_rows, "SemanticScholar")
-                    if not primary_rows:
-                        q2 = _simplify_boolean(q)
-                        fallback_rows = SRC.search_semantic_scholar(run_id, q2, term_origin, limit=min(per_source, 20))
-                        fallback_rows = _force_engine(fallback_rows, "SemanticScholar")
-                        got = len(fallback_rows)
-                        if got:
-                            print(f"[collect] SemanticScholar fallback hit {got} using simplified query.")
-                        new_rows = fallback_rows
-                    else:
-                        new_rows = primary_rows
+                    q_simple = _simplify_boolean(q)
+                    new_rows: List[Dict[str,str]] = []
+
+                    r1 = SRC.search_semantic_scholar(run_id, q_simple, term_origin, limit=min(per_source, 50))
+                    r1 = _force_engine(r1, "SemanticScholar")
+                    new_rows += r1 or []
+
+                    if len(new_rows) < per_source:
+                        r2 = SRC.search_semantic_scholar(run_id, q, term_origin, limit=min(per_source - len(new_rows), 50))
+                        r2 = _force_engine(r2, "SemanticScholar")
+                        new_rows += r2 or []
+
+                    new_rows = [_normalize_row(r) for r in (new_rows or [])]
                     collected += new_rows
                     engine_counts["SemanticScholar"] += len(new_rows)
-                    _write_csv2(out_partial, new_rows)
-                    print(f"[collect] SemanticScholar: +{len(new_rows)} for this query.")
+                    if new_rows:
+                        _write_csv2(out_partial, new_rows)
+                        since_last_cp += len(new_rows)
+                        _maybe_checkpoint(False)
+                    print(f"[collect] SemanticScholar: +{len(new_rows)} (simple→boolean).")
+
                 except Exception as e:
                     engine_errors["SemanticScholar"] += 1
                     print(f"[collect][SemanticScholar] error: {e}")
+
 
         return True
 
@@ -538,17 +667,34 @@ def run(
     # Only enrich items that are missing/short abstracts.
     try:
         _enrich_missing_abstracts(collected)
+
     except Exception as e:
         print(f"[enrich] non-fatal error: {e}")
 
-    # ---- Finalize outputs -----------------------------------------------------
-    deduped = _dedupe(collected)
+    # Always produce a final CSV (even if empty), and force one last checkpoint
     try:
-        if os.path.exists(out_csv):
-            os.remove(out_csv)
+        _maybe_checkpoint(True)
     except Exception:
         pass
-    _write_csv2(out_csv, deduped)
+
+    # ---- Finalize outputs -----------------------------------------------------
+    try:
+        deduped = _dedupe(collected)
+    except Exception as e:
+        print(f"[finalize] dedupe failed, writing raw collected: {e}")
+        deduped = list(collected)
+
+    try:
+        # ensure header exists, then overwrite cleanly
+        _ensure_csv2_header(out_csv)
+        try:
+            if os.path.exists(out_csv):
+                os.remove(out_csv)
+        except Exception:
+            pass
+        _write_csv2(out_csv, deduped)
+    except Exception as e:
+        print(f"[finalize] write failed: {e}")
 
     # Coverage summary
     try:
@@ -559,9 +705,18 @@ def run(
     except Exception:
         pass
 
+    # Last-chance safety: guarantee folder + at least headers exist if we crashed before writing
+    try:
+        if paths.get('csv'):
+            os.makedirs(paths['csv'], exist_ok=True)
+            _ensure_csv2_header(os.path.join(paths['csv'], 'search_results_partial.csv'))
+            _ensure_csv2_header(os.path.join(paths['csv'], 'search_results_enriched_partial.csv'))
+            _ensure_csv2_header(os.path.join(paths['csv'], 'search_results_raw.csv'))
+    except Exception as e:
+        print(f"[guard] could not ensure output files: {e}")
 
     msg = f"CSV written: {out_csv}  (raw: {len(collected)}, deduped: {len(deduped)})"
-
     print(msg)
     return True, msg
+
 
