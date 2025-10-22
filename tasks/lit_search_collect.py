@@ -1,7 +1,8 @@
 # tasks/lit_search_collect.py
 from __future__ import annotations
 
-import os, csv, datetime, re, time, html, unicodedata
+import os, csv, datetime, re, time, html, unicodedata, itertools
+
 from collections import defaultdict
 from typing import Optional, Dict, List, Tuple
 from core.lit.utils import to_list, run_dirs
@@ -537,6 +538,114 @@ def _bag_of_words(q: str) -> str:
     s = re.sub(r'\s+', ' ', s).strip()
     return s
 
+def _is_simple_word_or_phrase(s: str) -> bool:
+    """
+    True if s is a single token or a 2-word phrase (after stripping quotes).
+    We allow hyphenated words as 1 token.
+    """
+    if not s:
+        return False
+    s = s.strip().strip('"').strip("'")
+    if not s:
+        return False
+    # collapse whitespace and split
+    parts = re.sub(r'\s+', ' ', s).split(' ')
+    return 1 <= len(parts) <= 2
+
+def _simple_starter_terms(spec: QuerySpec) -> List[str]:
+    """
+    Build a pool of 1–2 word terms from CSV-1 fields.
+    Priority: seed_terms > must_phrases > title_bias_terms > expanded_terms > any_phrases
+    (We keep order and uniqueness.)
+    """
+    pools = [
+        spec.seed_terms or [],
+        spec.must_phrases or [],
+        spec.title_bias_terms or [],
+        spec.expanded_terms or [],
+        spec.any_phrases or [],
+    ]
+    seen = set()
+    out = []
+    for pool in pools:
+        for t in pool:
+            t = (t or "").strip()
+            if not t:
+                continue
+            # keep original phrase quoting if present
+            if _is_simple_word_or_phrase(t):
+                key = t.strip().lower()
+                if key not in seen:
+                    seen.add(key)
+                    out.append(t)
+    return out
+
+def _build_simple_queries(spec: QuerySpec, max_single: int = 30, max_pairs: int = 30) -> List[str]:
+    """
+    Produce a list of very simple queries to probe breadth first:
+      - Single 1–2 word tokens/phrases (capped)
+      - Then 2-term combos (joined with space), also capped
+    The engines will interpret these as broad bag-of-words / ti/abs matches depending on their API.
+    """
+    terms = _simple_starter_terms(spec)
+    singles = terms[:max_single]
+
+    # build 2-term combos while avoiding very long phrases
+    pairs = []
+    for a, b in itertools.combinations(singles, 2):
+        a_clean = a.strip().strip('"')
+        b_clean = b.strip().strip('"')
+        # keep pair if each element is itself "simple"
+        if _is_simple_word_or_phrase(a_clean) and _is_simple_word_or_phrase(b_clean):
+            pairs.append(f'{_phrase(a_clean)} {_phrase(b_clean)}')
+        if len(pairs) >= max_pairs:
+            break
+
+    # Keep quoting on multi-word elements, overall query is just space-joined tokens.
+    starters = []
+    starters.extend([_phrase(s) for s in singles])
+    starters.extend(pairs)
+
+    # Trim overlong starters (very rare, but safe)
+    starters = [_trim_len(q, 200) for q in starters if q and q.strip()]
+    # Deduplicate while preserving order
+    seen = set(); uniq = []
+    for q in starters:
+        k = q.strip().lower()
+        if k not in seen:
+            seen.add(k); uniq.append(q)
+    return uniq
+
+def _plan_queries_staged(engine: str, spec: QuerySpec, base_boolean: str) -> List[str]:
+    """
+    Stage 1: super-simple starters (1–2 word queries).
+    Stage 2: existing engine-specific planned queries (complex).
+    We return starters first, then the planned set, de-duplicated.
+    """
+    # Allow environment overrides for scaling
+    try:
+        max_single = int(os.getenv("LIT_SIMPLE_SINGLE_MAX", "30"))
+    except Exception:
+        max_single = 30
+    try:
+        max_pairs = int(os.getenv("LIT_SIMPLE_PAIRS_MAX", "30"))
+    except Exception:
+        max_pairs = 30
+
+    starters = _build_simple_queries(spec, max_single=max_single, max_pairs=max_pairs)
+    planned  = _plan_queries_for_engine(engine, spec, base_boolean)
+
+    # Merge starters first, then planned (unique, in order)
+    seen = set(); out = []
+    for q in starters + planned:
+        if not q:
+            continue
+        k = q.strip().lower()
+        if k not in seen:
+            seen.add(k); out.append(q)
+    return out
+
+
 def _trim_len(s: str, max_len: int = 300) -> str:
     """APIs like OpenAlex/S2 tolerate ~200-500 chars. Trim politely."""
     if not s or len(s) <= max_len: return s
@@ -787,7 +896,7 @@ def run(
                 try:
                     engine = "OpenAlex"
                     new_rows: List[Dict[str,str]] = []
-                    for q in _plan_queries_for_engine(engine, spec, base_q_clean):
+                    for q in _plan_queries_staged(engine, spec, base_q_clean):
                         if _should_stop(stop_flag_path): break
 
                         if len(new_rows) >= per_source: break
@@ -833,7 +942,7 @@ def run(
                 try:
                     engine = "Crossref"
                     new_rows: List[Dict[str,str]] = []
-                    for q in _plan_queries_for_engine(engine, spec, base_q_clean):
+                    for q in _plan_queries_staged(engine, spec, base_q_clean):
                         if _should_stop(stop_flag_path): break
 
                         if len(new_rows) >= per_source: break
@@ -879,7 +988,7 @@ def run(
                     engine = "arXiv"
                     new_rows: List[Dict[str,str]] = []
                     # IMPORTANT: do NOT simplify; use planner output
-                    for q in _plan_queries_for_engine(engine, spec, base_q_clean):
+                    for q in _plan_queries_staged(engine, spec, base_q_clean):
                         if _should_stop(stop_flag_path): break
 
                         if len(new_rows) >= per_source: break
@@ -925,11 +1034,10 @@ def run(
                     engine = "PubMed"
                     new_rows: List[Dict[str,str]] = []
                     # IMPORTANT: do NOT simplify; use planner output with field tags
-                    for q in _plan_queries_for_engine(engine, spec, base_q_clean):
+                    for q in _plan_queries_staged(engine, spec, base_q_clean):
                         if _should_stop(stop_flag_path): break
 
                         if len(new_rows) >= per_source: break
-                        _log_query(engine, q)
                         _log_query(engine, q)
                         engine_attempts[engine] += 1
                         t0 = time.time()
@@ -971,7 +1079,7 @@ def run(
                 try:
                     engine = "SemanticScholar"
                     new_rows: List[Dict[str,str]] = []
-                    for q in _plan_queries_for_engine(engine, spec, base_q_clean):
+                    for q in _plan_queries_staged(engine, spec, base_q_clean):
                         if _should_stop(stop_flag_path): break
 
                         if len(new_rows) >= per_source: break
