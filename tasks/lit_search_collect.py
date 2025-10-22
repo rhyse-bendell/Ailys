@@ -997,7 +997,7 @@ def run(
                         try:
                             r = SRC.search_openalex(
                                 run_id, q, term_origin,
-                                per_page=min(per_source - len(new_rows), 25),
+                                per_page=min(per_source - len(new_rows), 200),  # cursor pages up to 200
                                 max_pages=_max_pages("OpenAlex")
                             )
                             n = len(r or [])
@@ -1304,25 +1304,25 @@ def run(
         print(f"[guard] could not ensure output files: {e}")
 
 
-# ---- Final status ------------------------------------------------------------
-try:
-    raw_rows = len(collected)
-except Exception:
-    raw_rows = -1
-try:
-    final_rows = len(deduped)
-except Exception:
-    final_rows = -1
+    # ---- Final status ------------------------------------------------------------
+    try:
+        raw_rows = len(collected)
+    except Exception:
+        raw_rows = -1
+    try:
+        final_rows = len(deduped)
+    except Exception:
+        final_rows = -1
 
-msg = (
-    f"RAW (all rows) written: {out_all} | rows={raw_rows}\n"
-    f"FINAL (dedup+merged) written: {out_final} | rows={final_rows}"
-)
-print(msg)
-# also drop a single-line summary into the results log
-try:
-    _write_log_line(results_log_path, f"[FINAL] raw={raw_rows} final={final_rows} | out_all={out_all} | out_final={out_final}")
-except Exception:
-    pass
+    msg = (
+        f"RAW (all rows) written: {out_all} | rows={raw_rows}\n"
+        f"FINAL (dedup+merged) written: {out_final} | rows={final_rows}"
+    )
+    print(msg)
+    # also drop a single-line summary into the results log
+    try:
+        _write_log_line(results_log_path, f"[FINAL] raw={raw_rows} final={final_rows} | out_all={out_all} | out_final={out_final}")
+    except Exception:
+        pass
 
-return True, msg
+    return True, msg

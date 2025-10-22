@@ -47,42 +47,215 @@ def _row(run_id: str, engine: str, query: str, term_origin: str, title: str, aut
         "source_score": "" if source_score is None else f"{source_score:.3f}",
     }
 
-# ---- OpenAlex ---------------------------------------------------------------
-def search_openalex(run_id: str, query: str, term_origin: str, per_page:int=20, max_pages:int=1, mailto: Optional[str]=None) -> List[Dict[str,str]]:
-    rows = []
-    for page in range(1, max_pages+1):
-        params = {
-            "search": query,
-            "page": page,
-            "per_page": per_page,
-            "mailto": mailto or os.getenv("OPENALEX_EMAIL","")
-        }
-        url = "https://api.openalex.org/works"
-        resp = _get(url, params=params, desc=f"OpenAlex search (page {page}): {query}")
-        if not resp:
+
+# ---- OpenAlex (robust, cursor-based) ---------------------------------------
+import re
+from json import JSONDecodeError
+
+_BOOL_RE  = re.compile(r'\b(AND|OR|NOT)\b', flags=re.I)
+_PAREN_RE = re.compile(r'[()]')
+_QUOTE_RE = re.compile(r'["“”]+')
+
+def _sanitize_bow(q: str) -> str:
+    """Make a search-friendly bag-of-words for OpenAlex: drop booleans/parens, keep spacing."""
+    if not q:
+        return q
+    s = q.strip()
+    s = _BOOL_RE.sub(" ", s)
+    s = _PAREN_RE.sub(" ", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+def _strip_quotes(s: str) -> str:
+    return _QUOTE_RE.sub("", s or "").strip()
+
+def _reconstruct_abstract_from_inverted(inv: dict | None) -> str:
+    """Rebuild OpenAlex abstract from abstract_inverted_index safely."""
+    if not inv or not isinstance(inv, dict):
+        return ""
+    try:
+        positions = []
+        for token, idxs in inv.items():
+            token = str(token)
+            for i in idxs:
+                positions.append((int(i), token))
+        positions.sort(key=lambda x: x[0])
+        return " ".join(tok for _, tok in positions)
+    except Exception:
+        return ""
+
+def _openalex_headers() -> Dict[str, str]:
+    # Be polite; include mailto in UA if provided.
+    mailto = (os.getenv("OPENALEX_EMAIL", "") or os.getenv("CROSSREF_MAILTO","")).strip()
+    ua = f"Ailys/1.0 (mailto:{mailto})" if mailto else "Ailys/1.0"
+    return {"User-Agent": ua}
+
+def _build_openalex_param_strategies(query: str) -> List[Dict[str, str]]:
+    """
+    Try a few tolerant strategies so brittle queries still work:
+      1) search = sanitized original
+      2) search = no-quotes version
+      3) title.search = no-quotes
+      4) abstract.search = no-quotes
+    """
+    s1 = _sanitize_bow(query)
+    s2 = _strip_quotes(s1)
+    tries: List[Dict[str, str]] = []
+    if s1:
+        tries.append({"search": s1})
+    if s2 and s2 != s1:
+        tries.append({"search": s2})
+    if s2:
+        tries.append({"title.search": s2})
+        tries.append({"abstract.search": s2})
+    return tries or [{"search": (s2 or s1 or query)}]
+
+def search_openalex(
+    run_id: str,
+    query: str,
+    term_origin: str,
+    per_page: int = 20,
+    max_pages: int = 1,
+    mailto: Optional[str] = None
+) -> List[Dict[str, str]]:
+    """
+    OpenAlex works search with cursor pagination & resilient parsing.
+
+    - per_page: total target rows to return for this query (we may fetch fewer).
+    - max_pages: safety cap on cursor pages (each page can return up to 200).
+    """
+    base_url = "https://api.openalex.org/works"
+    out: List[Dict[str, str]] = []
+
+    # OpenAlex supports up to ~200 items per cursor page
+    target_total = max(1, int(per_page))
+    page_chunk   = min(200, max(25, target_total))
+
+    # Build polite headers; keep using your approval-wrapped GET.
+    headers = _openalex_headers()
+    tries = _build_openalex_param_strategies(query)
+
+    for param_try in tries:
+        cursor = "*"
+        pages_used = 0
+
+        while pages_used < max_pages and len(out) < target_total:
+            params = {
+                "per_page": page_chunk,
+                "cursor": cursor,
+                "mailto": mailto or os.getenv("OPENALEX_EMAIL", "")
+            }
+            params.update(param_try)
+
+            # Approval-wrapped call (same pattern as the rest of your sources)
+            resp = _get(
+                base_url,
+                params=params,
+                headers=headers,
+                desc=f"OpenAlex search (page {pages_used+1}): {query}"
+            )
+            if not resp:
+                # network/approval error → try next strategy
+                break
+
+            # Robust JSON decode guard
+            try:
+                data = resp.json()
+            except JSONDecodeError:
+                # Non-JSON (rare) → try next strategy
+                break
+            except Exception:
+                break
+
+            if not isinstance(data, dict):
+                # Unexpected body → try next strategy
+                break
+
+            results = data.get("results") or []
+            if not isinstance(results, list):
+                # Unexpected shape → try next strategy
+                break
+
+            for it in results:
+                try:
+                    # Title
+                    title = (it.get("display_name") or it.get("title") or "").strip()
+
+                    # Authors
+                    authors = []
+                    for a in (it.get("authorships") or []):
+                        nm = (a.get("author") or {}).get("display_name") or ""
+                        if nm:
+                            authors.append(nm)
+
+                    # Year
+                    year = it.get("publication_year") or it.get("from_year")
+
+                    # Venue
+                    venue = ""
+                    primary = it.get("primary_location") or {}
+                    if isinstance(primary, dict):
+                        src = primary.get("source") or {}
+                        if isinstance(src, dict):
+                            venue = src.get("display_name") or venue
+                    if not venue:
+                        hv = it.get("host_venue") or {}
+                        if isinstance(hv, dict):
+                            venue = hv.get("display_name") or venue
+
+                    # DOI
+                    doi = ""
+                    ids = it.get("ids") or {}
+                    if isinstance(ids, dict):
+                        doi = (ids.get("doi") or "").replace("https://doi.org/", "").strip().lower()
+                    if not doi:
+                        raw_doi = it.get("doi")
+                        if isinstance(raw_doi, str):
+                            doi = raw_doi.replace("https://doi.org/", "").strip().lower()
+
+                    # URL (landing page preferred; fallbacks allowed)
+                    url1 = ""
+                    if isinstance(primary, dict):
+                        url1 = primary.get("landing_page_url") or url1
+                        if not url1 and isinstance(primary.get("source"), dict):
+                            url1 = primary["source"].get("homepage_url") or url1
+                    if not url1:
+                        boa = it.get("best_oa_location")
+                        if isinstance(boa, dict):
+                            url1 = boa.get("url") or url1
+                        elif isinstance(boa, str):
+                            url1 = boa or url1
+                    if not url1:
+                        url1 = it.get("openaccess_url") or it.get("id") or ""
+
+                    # Abstract
+                    abstract = _reconstruct_abstract_from_inverted(it.get("abstract_inverted_index")) or (it.get("abstract") or "")
+
+                    # Source score (cited_by_count is useful)
+                    score = it.get("cited_by_count")
+
+                    out.append(_row(run_id, "OpenAlex", query, term_origin, title, authors, year, venue, doi, url1, abstract, score))
+                except Exception:
+                    # Skip malformed record; continue
+                    continue
+
+            # Cursor advance
+            meta = data.get("meta") or {}
+            next_cursor = meta.get("next_cursor")
+            if not next_cursor:
+                break
+            cursor = next_cursor
+            pages_used += 1
+
+            _sleep()  # respect your global throttle
+
+        # If we captured anything for this strategy, stop trying alternates
+        if out:
             break
-        data = resp.json()
-        for it in data.get("results", []):
-            title = it.get("title","")
-            authors = _norm_authors([a.get("author",{}) for a in it.get("authorships",[])])
-            year = it.get("publication_year")
-            venue = (it.get("host_venue") or {}).get("display_name","")
-            doi = (it.get("doi") or "").replace("https://doi.org/","").strip()
-            url1 = (it.get("primary_location") or {}).get("source",{}).get("host_venue_url") or it.get("open_access",{}).get("oa_url") or it.get("primary_location",{}).get("landing_page_url","")
-            abstract = ""
-            if it.get("abstract_inverted_index"):
-                # reconstitute the abstract
-                idx = it["abstract_inverted_index"]
-                # build token list by positions
-                maxpos = max(p for positions in idx.values() for p in positions)
-                tokens = [""]*(maxpos+1)
-                for word, poss in idx.items():
-                    for p in poss: tokens[p]=word
-                abstract = " ".join(t for t in tokens if t)
-            score = None
-            rows.append(_row(run_id,"OpenAlex",query,term_origin,title,authors,year,venue,doi,url1,abstract,score))
-        _sleep()
-    return rows
+
+    # Trim to the requested total
+    return out[:target_total]
+
 
 # ---- Crossref ---------------------------------------------------------------
 def search_crossref(run_id: str, query: str, term_origin: str, rows:int=20, mailto: Optional[str]=None) -> List[Dict[str,str]]:
