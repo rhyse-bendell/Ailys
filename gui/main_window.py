@@ -193,6 +193,8 @@ class AilysGUI(QWidget):
         self.create_api_config_tab()
 
         self.create_lit_search_tab()
+        self.create_lit_relevance_tab()
+
         self.create_literature_tab()
         self.create_batch_tab()
 
@@ -761,6 +763,140 @@ class AilysGUI(QWidget):
     # =========================================================================== #
     # -------------------------- Button Handlers -------------------------------- #
     # =========================================================================== #
+    # -------------------------- Lit Relevance Tab ------------------------------ #
+    def create_lit_relevance_tab(self):
+        """
+        Stage C – Relevance scoring (CSV-2 → rank-ordered CSV for PDF pulls).
+        Uses tasks/lit_review_relevance.run (approval-gated via artificial cognition).
+        """
+        from PySide6.QtWidgets import (
+            QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QTextEdit,
+            QPushButton, QFileDialog, QGroupBox
+        )
+
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
+
+        # Inputs group
+        ibox = QGroupBox("Inputs")
+        ilay = QVBoxLayout(ibox)
+
+        # CSV-1 (prompt_to_keywords.csv)
+        row1 = QHBoxLayout()
+        self.rel_csv1_path = QLineEdit()
+        self.rel_csv1_path.setPlaceholderText("Path to prompt_to_keywords.csv")
+        btn_browse_csv1 = QPushButton("Browse…")
+        row1.addWidget(QLabel("Keywords CSV (CSV-1):"))
+        row1.addWidget(self.rel_csv1_path)
+        row1.addWidget(btn_browse_csv1)
+        ilay.addLayout(row1)
+
+        # Collected CSV (optional, defaults to search_results_final.csv in the run’s CSV folder)
+        row2 = QHBoxLayout()
+        self.rel_input_csv = QLineEdit()
+        self.rel_input_csv.setPlaceholderText("Optional: path to search_results_final.csv")
+        btn_browse_input = QPushButton("Browse…")
+        row2.addWidget(QLabel("Collected CSV (CSV-2):"))
+        row2.addWidget(self.rel_input_csv)
+        row2.addWidget(btn_browse_input)
+        ilay.addLayout(row2)
+
+        # Batch size + Max items (optional cap)
+        row3 = QHBoxLayout()
+        self.rel_batch_size = QLineEdit()
+        self.rel_batch_size.setPlaceholderText("e.g., 15")
+        self.rel_max_items = QLineEdit()
+        self.rel_max_items.setPlaceholderText("Optional cap, e.g., 200")
+        row3.addWidget(QLabel("Batch size:"))
+        row3.addWidget(self.rel_batch_size)
+        row3.addWidget(QLabel("Max items:"))
+        row3.addWidget(self.rel_max_items)
+        ilay.addLayout(row3)
+
+        # Optional literature need override
+        self.rel_need_override = QTextEdit()
+        self.rel_need_override.setPlaceholderText(
+            "Optional: override the literature need / context for this scoring run.\n"
+            "If left blank, the task will use details from CSV-1."
+        )
+        ilay.addWidget(QLabel("Override Literature Need (optional)"))
+        ilay.addWidget(self.rel_need_override)
+
+        layout.addWidget(ibox)
+
+        # Actions
+        self.btn_rel_run = QPushButton("Run Relevance Scoring")
+        layout.addWidget(self.btn_rel_run)
+
+        # Browse handlers
+        def browse_csv1():
+            path, _ = QFileDialog.getOpenFileName(self, "Select prompt_to_keywords.csv", "", "CSV Files (*.csv)")
+            if path:
+                self.rel_csv1_path.setText(path)
+
+        def browse_input():
+            path, _ = QFileDialog.getOpenFileName(self, "Select search_results_final.csv", "", "CSV Files (*.csv)")
+            if path:
+                self.rel_input_csv.setText(path)
+
+        btn_browse_csv1.clicked.connect(browse_csv1)
+        btn_browse_input.clicked.connect(browse_input)
+
+        # Run handler
+        def _run_rel():
+            csv1 = self.rel_csv1_path.text().strip()
+            if not csv1:
+                self.chat_log.append("⚠️ Please select the CSV-1 (prompt_to_keywords.csv).")
+                return
+
+            input_csv = self.rel_input_csv.text().strip() or None
+
+            batch = None
+            btxt = self.rel_batch_size.text().strip()
+            if btxt:
+                try:
+                    batch = int(btxt)
+                except ValueError:
+                    self.chat_log.append("⚠️ Batch size must be an integer; leaving default.")
+                    batch = None
+
+            max_items = None
+            mtxt = self.rel_max_items.text().strip()
+            if mtxt:
+                try:
+                    max_items = int(mtxt)
+                except ValueError:
+                    self.chat_log.append("⚠️ Max items must be an integer; ignoring.")
+                    max_items = None
+
+            need_override = self.rel_need_override.toPlainText().strip() or None
+
+            self.chat_log.append("⏳ Relevance scoring will request approvals per batch in the Approvals pane.")
+
+            def _task():
+                try:
+                    from tasks.lit_review_relevance import run as rel_run
+                except Exception as e:
+                    return False, f"Could not import relevance task: {e}"
+                ok, msg = rel_run(
+                    csv1_path=csv1,
+                    collected_csv_path=input_csv,
+                    batch_size=batch,
+                    max_items=max_items,
+                    need_override=need_override
+                )
+                return ok, msg
+
+            self.thread = TaskRunnerThread(_task)
+            self.thread.update_status.connect(self.chat_log.append)
+            self.thread.finished.connect(self.task_finished_with_result)
+            self.thread.start()
+
+        self.btn_rel_run.clicked.connect(_run_rel)
+
+        self.tabs.addTab(tab, "Lit Relevance")
 
     def run_ls_keywords(self):
         """Stage A – Prompt → Keywords (CSV-1)."""
