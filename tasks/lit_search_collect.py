@@ -580,6 +580,91 @@ def _simple_starter_terms(spec: QuerySpec) -> List[str]:
                     out.append(t)
     return out
 
+def _merge_records(rows: List[Dict[str, str]]) -> Dict[str, str]:
+    """
+    Merge duplicate records for the same work into a single best row.
+    Preference order:
+      - DOI present over missing
+      - Longer abstract (cleaned), with a soft threshold preference (>=120 chars)
+      - Non-empty venue/year/authors
+      - Engine precedence as final tie-breaker
+    """
+    if not rows:
+        return {}
+
+    # Engine precedence (leftmost is preferred for ties on remaining fields)
+    engine_rank = {e: i for i, e in enumerate(["OpenAlex","Crossref","SemanticScholar","PubMed","arXiv"])}
+
+    # Normalize and collect candidates
+    cands = []
+    for r in rows:
+        rr = _normalize_row(r)
+        abs_text = rr.get("abstract") or ""
+        abs_len = len(abs_text)
+        doi_present = 1 if rr.get("doi") else 0
+        venue_present = 1 if (rr.get("venue") or "").strip() else 0
+        authors_present = 1 if (rr.get("authors|;|") or "").strip() else 0
+        year_present = 1 if (rr.get("year") or "").strip() else 0
+        engine_score = -engine_rank.get(rr.get("engine",""), 99)  # higher is better
+
+        # Prefer abstracts over 120 chars; use two-tier score
+        abs_tier = 2 if abs_len >= 120 else (1 if abs_len > 0 else 0)
+
+        cands.append((
+            doi_present,   # 0
+            abs_tier,      # 1
+            abs_len,       # 2
+            venue_present, # 3
+            authors_present,# 4
+            year_present,  # 5
+            engine_score,  # 6
+            rr             # 7 actual row
+        ))
+
+    # Sort by tuple descending to pick the best
+    cands.sort(reverse=True)
+    best = dict(cands[0][7])  # start with the best base row
+
+    # Fill any missing fields from others (do not overwrite non-empty)
+    for _,_,_,_,_,_,_, rr in cands[1:]:
+        for k in ["doi","url","title","venue","year","authors|;|","abstract","work_id","engine","query","term_origin","source_score","run_id"]:
+            if not (best.get(k) or "").strip():
+                v = (rr.get(k) or "").strip()
+                if v:
+                    best[k] = v
+        # Replace abstract if the new one is clearly better
+        old_abs = best.get("abstract") or ""
+        new_abs = rr.get("abstract") or ""
+        if len(new_abs) >= 120 and len(old_abs) < 120:
+            best["abstract"] = new_abs
+        elif len(new_abs) > len(old_abs) and len(old_abs) < 120:
+            best["abstract"] = new_abs
+
+    return _normalize_row(best)
+
+
+def _merge_dedupe(rows: List[Dict[str,str]]) -> List[Dict[str,str]]:
+    """
+    Group by DOI (if present) else (title.lower, year) and merge each group.
+    """
+    groups: Dict[Tuple, List[Dict[str,str]]] = {}
+    for r in rows:
+        r = _normalize_row(r)
+        doi = (r.get("doi") or "").strip().lower()
+        if doi:
+            key = ("doi", doi)
+        else:
+            title = (r.get("title") or "").strip().lower()
+            year = (r.get("year") or "").strip()
+            key = ("title_year", title, year)
+        groups.setdefault(key, []).append(r)
+
+    merged = []
+    for _k, bucket in groups.items():
+        merged.append(_merge_records(bucket))
+    return merged
+
+
 def _build_simple_queries(spec: QuerySpec, max_single: int = 30, max_pairs: int = 30) -> List[str]:
     """
     Produce a list of very simple queries to probe breadth first:
@@ -773,9 +858,15 @@ def run(
     try: os.environ["LIT_STOP_FLAG_PATH"] = stop_flag_path
     except Exception: pass
 
-    out_csv = os.path.join(paths["csv"], "search_results_raw.csv")
+    # True RAW (legacy name kept, but now truly "all rows"): every collected row, no dedupe/merge
+    out_all = os.path.join(paths["csv"], "search_results_raw.csv")
+    _ensure_csv2_header(out_all)
 
-    # Streaming (append-as-we-go) file for progress monitoring (non-deduped)
+    # Final, de-duplicated + merged file (this is what downstream stages should consume)
+    out_final = os.path.join(paths["csv"], "search_results_final.csv")  # new canonical final
+    # (header ensured later right before writing)
+
+    # Streaming (append-as-we-go) file for progress monitoring (non-deduped, handy for tails)
     out_partial = os.path.join(paths["csv"], "search_results_partial.csv")
     _ensure_csv2_header(out_partial)
 
@@ -927,6 +1018,7 @@ def run(
                     engine_counts[engine] += len(new_rows)
                     if new_rows:
                         _write_csv2(out_partial, new_rows)
+                        _write_csv2(out_all, new_rows)
                         since_last_cp += len(new_rows)
                         _maybe_checkpoint(False)
                     print(f"[collect] {engine}: +{len(new_rows)} (planned queries).")
@@ -972,6 +1064,7 @@ def run(
                     engine_counts[engine] += len(new_rows)
                     if new_rows:
                         _write_csv2(out_partial, new_rows)
+                        _write_csv2(out_all, new_rows)
                         since_last_cp += len(new_rows)
                         _maybe_checkpoint(False)
                     print(f"[collect] {engine}: +{len(new_rows)} (planned queries).")
@@ -1018,6 +1111,7 @@ def run(
                     engine_counts[engine] += len(new_rows)
                     if new_rows:
                         _write_csv2(out_partial, new_rows)
+                        _write_csv2(out_all, new_rows)
                         since_last_cp += len(new_rows)
                         _maybe_checkpoint(False)
                     print(f"[collect] {engine}: +{len(new_rows)} (planned queries).")
@@ -1064,6 +1158,7 @@ def run(
                     engine_counts[engine] += len(new_rows)
                     if new_rows:
                         _write_csv2(out_partial, new_rows)
+                        _write_csv2(out_all, new_rows)
                         since_last_cp += len(new_rows)
                         _maybe_checkpoint(False)
                     print(f"[collect] {engine}: +{len(new_rows)} (planned queries).")
@@ -1109,6 +1204,7 @@ def run(
                     engine_counts[engine] += len(new_rows)
                     if new_rows:
                         _write_csv2(out_partial, new_rows)
+                        _write_csv2(out_all, new_rows)
                         since_last_cp += len(new_rows)
                         _maybe_checkpoint(False)
                     print(f"[collect] {engine}: +{len(new_rows)} (planned queries).")
@@ -1154,22 +1250,26 @@ def run(
 
     # ---- Finalize outputs -----------------------------------------------------
     try:
-        deduped = _dedupe(collected)
+        deduped = _merge_dedupe(collected)
     except Exception as e:
-        print(f"[finalize] dedupe failed, writing raw collected: {e}")
-        deduped = list(collected)
-
-    try:
-        # ensure header exists, then overwrite cleanly
-        _ensure_csv2_header(out_csv)
+        print(f"[finalize] merge-dedupe failed, falling back to simple dedupe: {e}")
         try:
-            if os.path.exists(out_csv):
-                os.remove(out_csv)
+            deduped = _dedupe(collected)
+        except Exception as e2:
+            print(f"[finalize] simple dedupe also failed, writing raw collected: {e2}")
+            deduped = list(collected)
+
+    # Write FINAL (dedup/merged) cleanly
+    try:
+        _ensure_csv2_header(out_final)
+        try:
+            if os.path.exists(out_final):
+                os.remove(out_final)
         except Exception:
             pass
-        _write_csv2(out_csv, deduped)
+        _write_csv2(out_final, deduped)
     except Exception as e:
-        print(f"[finalize] write failed: {e}")
+        print(f"[finalize] final write failed: {e}")
 
     # Coverage summary
     try:
@@ -1198,12 +1298,31 @@ def run(
             os.makedirs(paths['csv'], exist_ok=True)
             _ensure_csv2_header(os.path.join(paths['csv'], 'search_results_partial.csv'))
             _ensure_csv2_header(os.path.join(paths['csv'], 'search_results_enriched_partial.csv'))
-            _ensure_csv2_header(os.path.join(paths['csv'], 'search_results_raw.csv'))
+            _ensure_csv2_header(os.path.join(paths['csv'], 'search_results_raw.csv'))  # true RAW
+            _ensure_csv2_header(os.path.join(paths['csv'], 'search_results_final.csv'))  # FINAL dedup/merged
     except Exception as e:
         print(f"[guard] could not ensure output files: {e}")
 
-    msg = f"CSV written: {out_csv}  (raw: {len(collected)}, deduped: {len(deduped)})"
-    print(msg)
-    return True, msg
 
+# ---- Final status ------------------------------------------------------------
+try:
+    raw_rows = len(collected)
+except Exception:
+    raw_rows = -1
+try:
+    final_rows = len(deduped)
+except Exception:
+    final_rows = -1
 
+msg = (
+    f"RAW (all rows) written: {out_all} | rows={raw_rows}\n"
+    f"FINAL (dedup+merged) written: {out_final} | rows={final_rows}"
+)
+print(msg)
+# also drop a single-line summary into the results log
+try:
+    _write_log_line(results_log_path, f"[FINAL] raw={raw_rows} final={final_rows} | out_all={out_all} | out_final={out_final}")
+except Exception:
+    pass
+
+return True, msg
