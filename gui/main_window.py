@@ -25,11 +25,12 @@ load_dotenv()
 
 mode = (os.getenv("AILYS_APPROVAL_MODE") or "manual").strip().lower()
 approvals.approval_queue.set_mode(mode)
+
 # Optional: prove we all see the same queue
-try:
-    print("GUI approval queue:", approvals._debug_id(), approvals._debug_counts())
-except Exception:
-    pass
+#try:
+#    print("GUI approval queue:", approvals._debug_id(), approvals._debug_counts())
+#except Exception:
+#    pass
 
 
 class TaskRunnerThread(QThread):
@@ -443,7 +444,7 @@ class AilysGUI(QWidget):
     def check_approval_notifications(self):
         pending = approvals.approval_queue.get_pending_requests()
         count = len(pending)
-        print(f"[GUI timer] queue_id={id(approvals.approval_queue)} pending={count}")
+        #print(f"[GUI timer] queue_id={id(approvals.approval_queue)} pending={count}")
 
         # only log when the number changes
         if count != self._last_pending_count:

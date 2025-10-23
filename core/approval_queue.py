@@ -114,7 +114,7 @@ class ApprovalQueue:
 
     def get_pending_requests(self) -> List[ApprovalRequest]:
         pend = [r for r in self._requests if r.approved is None]
-        print(f"[get_pending] pending={len(pend)} total={len(self._requests)} queue_id={id(self)}")
+#        print(f"[get_pending] pending={len(pend)} total={len(self._requests)} queue_id={id(self)}")
         return pend
 
     def approve_request(self, request_id: int, overrides: Optional[dict] = None) -> Optional[object]:

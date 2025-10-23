@@ -224,14 +224,26 @@ def run(
     collected_csv_path: Optional[str]=None,  # defaults to search_results_final.csv in run dirs
     batch_size: Optional[int]=None,
     max_items: Optional[int]=None,
+    need_override: Optional[str]=None,       # NEW: GUI can pass an explicit literature need
+    **_kwargs,                                # tolerate extra kwargs from older/newer GUIs
 ) -> Tuple[bool, str]:
     """
     Ingests CSVs from the search stage, scores relevance with LLM, and writes:
       - relevance_scored_partial.csv      (streaming)
       - relevance_scored_final.csv        (rank-ordered by overall_relevance desc)
-    Returns (ok, message).
+
+    Args:
+        csv1_path: path to prompt_to_keywords.csv (Stage A).
+        collected_csv_path: path to search_results_final.csv (Stage B output). If None, resolved from run dirs.
+        batch_size: rows per LLM batch (approval-gated via artificial cognition).
+        max_items: optional cap for debugging/smoke tests.
+        need_override: if provided and non-empty, this *replaces* any CSV-1 need/guidance text.
+                       (The GUI “Relevance” tab can set this when the user enters a custom need.)
+    Returns:
+        (ok, message)
     """
     print("Task started...")
+
 
     if not os.path.exists(csv1_path):
         return False, f"prompt_to_keywords CSV not found: {csv1_path}"
@@ -243,16 +255,28 @@ def run(
         return False, f"Failed to read CSV-1 context: {e}"
 
     run_id = (row1.get("run_id") or "").strip() or datetime.datetime.utcnow().strftime("run_%Y%m%d_%H%M%S")
-    need_text_parts = []
-    for k in ("research_need","user_prompt","prompt"):  # tolerate schema variations
-        if row1.get(k):
-            need_text_parts.append(str(row1[k]))
-    # fallbacks: synthesize from fields if no direct prompt column exists
-    if not need_text_parts:
-        seeds = ", ".join(to_list(row1.get("seed_terms|;|","")))
-        bools = "; ".join(to_list(row1.get("boolean_queries|;|","")))
-        need_text_parts.append(f"Seed terms: {seeds}\nBoolean queries: {bools}")
-    need_text = "\n".join([s for s in need_text_parts if s]).strip()
+
+    # Precedence: explicit GUI override > CSV-1 columns > synthesized fallback
+    need_text = ""
+    if isinstance(need_override, str) and need_override.strip():
+        need_text = need_override.strip()
+    else:
+        # tolerate schema variations across CSV-1
+        need_text_parts = []
+        for k in ("research_need","user_prompt","prompt","guidance","need","literature_need","search_prompt"):
+            v = row1.get(k)
+            if v:
+                need_text_parts.append(str(v))
+        if not need_text_parts:
+            # fallback: synthesize from other fields if no direct prompt column exists
+            seeds = ", ".join(to_list(row1.get("seed_terms|;|","")))
+            bools = "; ".join(to_list(row1.get("boolean_queries|;|","")))
+            need_text_parts.append(f"Seed terms: {seeds}\nBoolean queries: {bools}")
+        need_text = "\n".join([s for s in need_text_parts if s]).strip()
+
+    if not need_text:
+        return False, "No literature need text available. Provide need_override or ensure CSV-1 has a guidance/prompt column."
+
 
     # --- Resolve run directories the same way as the collection task ----------
     paths = run_dirs(run_id) or {}
@@ -361,7 +385,6 @@ def run(
     return True, msg
 
 
-# ------------------------------ CLI helper -----------------------------------
 if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser(description="Score and rank literature relevance.")
@@ -369,6 +392,13 @@ if __name__ == "__main__":
     ap.add_argument("--input", default=None, help="Path to collected results CSV (default: search_results_final.csv in run dirs)")
     ap.add_argument("--batch", type=int, default=None, help="Batch size (default env LIT_RELEVANCE_BATCH or 15)")
     ap.add_argument("--max-items", type=int, default=None, help="Optional cap for debugging")
+    ap.add_argument("--need-override", default=None, help="Optional explicit literature need to override CSV-1")
     args = ap.parse_args()
-    ok, msg = run(args.csv1, args.input, args.batch, args.max_items)
+    ok, msg = run(
+        csv1_path=args.csv1,
+        collected_csv_path=args.input,
+        batch_size=args.batch,
+        max_items=args.max_items,
+        need_override=args.need_override,
+    )
     print("✅" if ok else "❌", msg)

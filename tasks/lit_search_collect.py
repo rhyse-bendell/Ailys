@@ -2,6 +2,14 @@
 from __future__ import annotations
 
 import os, csv, datetime, re, time, html, unicodedata, itertools
+# Optional .env loader (no hard dependency). If python-dotenv is installed,
+# this will read a local .env so os.getenv(...) works without exporting shell vars.
+try:
+    from dotenv import load_dotenv
+    # override=False so real OS env stays authoritative if both are present
+    load_dotenv(override=False)
+except Exception:
+    pass
 
 from collections import defaultdict
 from typing import Optional, Dict, List, Tuple
@@ -271,21 +279,97 @@ def _simplify_boolean(q: str) -> str:
 
 
 def _build_pubmed_queries(spec: QuerySpec, base_boolean: str) -> List[str]:
-    """PubMed: preserve Boolean + phrases; tag Title/Abstract; chunk OR lists."""
-    queries = []
+    """
+    PubMed:
+      - Primary (strict) set: preserve boolean/phrases; Title/Abstract tags; chunk OR lists.
+      - Fallback (relaxed) set: add a small number of "bag-of-words in Title/Abstract"
+        queries that DO NOT over-constrain by aggressively combining many terms.
+    Both sets are returned (strict first), and later de-dup will handle overlaps.
+    Tune via env:
+      - LIT_PUBMED_RELAXED: "0" to disable relaxed fallback (default enabled)
+      - LIT_PUBMED_ANY_CHUNK: size for OR chunking (default 4)
+    """
+    queries: List[str] = []
+
+    # --- strict set ---
+    try:
+        any_chunk_n = max(1, int(os.getenv("LIT_PUBMED_ANY_CHUNK", "4")))
+    except Exception:
+        any_chunk_n = 4
+
     must = [f'{_phrase(p)}[Title/Abstract]' for p in (spec.must_phrases or []) if p.strip()]
     anys = [f'{_phrase(p)}[Title/Abstract]' for p in (spec.any_phrases or []) if p.strip()]
     nots = [f'{_phrase(p)}[Title/Abstract]' for p in (spec.exclude_terms or []) if p.strip()]
-    any_chunks = _chunk(anys, 4) if anys else [[]]
+    any_chunks = _chunk(anys, any_chunk_n) if anys else [[]]
+
+    base_part = f"({base_boolean})" if base_boolean else ""
+
     for ch in any_chunks:
         parts = []
         if must: parts.append("(" + " AND ".join(must) + ")")
         if ch:   parts.append("(" + " OR ".join(ch) + ")")
-        if base_boolean: parts.append(f"({base_boolean})")
+        if base_part: parts.append(base_part)
         if nots: parts.append("NOT (" + " OR ".join(nots) + ")")
         q = " AND ".join([p for p in parts if p])
-        if q.strip(): queries.append(q)
-    return queries or ([base_boolean] if base_boolean else [])
+        if q.strip():
+            queries.append(q)
+
+    # If there were no strict queries constructed, at least include base_boolean
+    if not queries and base_boolean:
+        queries.append(base_boolean)
+
+    # --- relaxed fallback ---
+    relaxed_enabled = (os.getenv("LIT_PUBMED_RELAXED", "1") != "0")
+    if relaxed_enabled:
+        # Build a small set of simpler TA queries that broaden recall.
+        seeds = []
+        seeds += [p for p in (spec.must_phrases or []) if p.strip()]
+        seeds += [p for p in (spec.any_phrases or []) if p.strip()]
+        seeds += [p for p in (spec.title_bias_terms or []) if p.strip()]
+
+        # Keep it compact: unique phrases, first ~10 singles and a few pairs
+        seen = set()
+        singles = []
+        for s in seeds:
+            k = s.strip().lower()
+            if k and k not in seen:
+                seen.add(k)
+                singles.append(s)
+            if len(singles) >= 10:
+                break
+
+        # Singles
+        for s in singles:
+            queries.append(f'{_phrase(s)}[Title/Abstract]')
+
+        # A handful of pairs to loosen conjunction effects
+        pair_limit = 8
+        c = 0
+        for i in range(len(singles)):
+            for j in range(i+1, len(singles)):
+                if c >= pair_limit:
+                    break
+                a = _phrase(singles[i])
+                b = _phrase(singles[j])
+                queries.append(f'({a}[Title/Abstract]) AND ({b}[Title/Abstract])')
+                c += 1
+            if c >= pair_limit:
+                break
+
+        # Finally, a plain bag-of-words base (unfielded) to catch strays
+        bow = _bag_of_words(base_boolean)
+        if bow:
+            queries.append(bow)
+
+    # De-duplicate while preserving order
+    uniq = []
+    seen = set()
+    for q in queries:
+        k = q.strip().lower()
+        if k and k not in seen:
+            seen.add(k); uniq.append(q)
+    return uniq
+
 
 def _build_arxiv_queries(spec: QuerySpec, base_boolean: str) -> List[str]:
     """arXiv: ti:/abs: fields, optional categories; keep phrases; avoid over-nesting."""
@@ -399,6 +483,88 @@ def _normalize_doi(doi: str | None) -> str:
     d = re.sub(r"^https?://(dx\.)?doi\.org/", "", d, flags=re.I)
     return d.lower()
 
+def _first_author_last(authors_field: str) -> str:
+    """
+    Extract a cleaned 'first author last name' from an authors field like:
+    'Fiore, Stephen M.; Smith, J.; ...' or 'Stephen M. Fiore; J. Smith'
+    Best-effort, tolerant to separators and ordering.
+    """
+    if not authors_field:
+        return ""
+    s = _clean_text(authors_field)
+    # Split on common delimiters between authors
+    parts = re.split(r"[;|,]\s*(?=[A-Z][^;|,]*)|;\s+| \|\| |\|;|;", s)
+    if not parts:
+        parts = [s]
+    first = parts[0].strip()
+
+    # Handle "Last, First" vs "First Last"
+    # Case 1: "Fiore, Stephen M."
+    m = re.match(r"^\s*([A-Za-z'`-]+)\s*,\s*.+$", first)
+    if m:
+        last = m.group(1)
+    else:
+        # Case 2: "Stephen M. Fiore"
+        tokens = re.split(r"\s+", first)
+        # drop initials like M., J., etc.
+        tokens = [t for t in tokens if not re.match(r"^[A-Z]\.?$", t)]
+        last = tokens[-1] if tokens else ""
+
+    last = unicodedata.normalize("NFKC", last)
+    last = re.sub(r"[^A-Za-z'`-]", "", last)
+    return last.lower()
+
+def _norm_title(title: str) -> str:
+    """Lightweight normalization for titles for hashing/blocking."""
+    if not title:
+        return ""
+    t = _clean_text(title)
+    t = t.lower()
+    # remove punctuation, keep letters/digits/spaces
+    t = re.sub(r"[^a-z0-9 ]+", " ", t)
+    t = re.sub(r"\s+", " ", t).strip()
+    return t
+
+def _title_prefix_key(norm_title: str, n: int = None) -> str:
+    """
+    Use the first N characters of the normalized title as a blocking key.
+    Tunable via env LIT_TITLE_PREFIX (default 12).
+    """
+    try:
+        if n is None:
+            n = int(os.getenv("LIT_TITLE_PREFIX", "12"))
+    except Exception:
+        n = 12
+    if not norm_title:
+        return ""
+    return norm_title[:n]
+
+def _fuzzy_sim(a: str, b: str) -> float:
+    """
+    Similarity (0..1). Use rapidfuzz if available; fallback to a simple token overlap.
+    """
+    a = (a or "").strip()
+    b = (b or "").strip()
+    if not a or not b:
+        return 0.0
+    # Try rapidfuzz (fast and robust)
+    try:
+        from rapidfuzz import fuzz
+        return fuzz.token_set_ratio(a, b) / 100.0
+    except Exception:
+        pass
+    # Fallback: token Jaccard+ containment
+    sa = set(a.split())
+    sb = set(b.split())
+    if not sa or not sb:
+        return 0.0
+    inter = len(sa & sb)
+    union = len(sa | sb)
+    cont = inter / max(1, min(len(sa), len(sb)))
+    jac = inter / max(1, union)
+    return 0.5 * cont + 0.5 * jac
+
+
 def _normalize_row(r: Dict[str, str]) -> Dict[str, str]:
     # Normalize common fields to reduce dupes + weird chars
     r = dict(r)
@@ -407,11 +573,21 @@ def _normalize_row(r: Dict[str, str]) -> Dict[str, str]:
     r["abstract"] = _clean_text(r.get("abstract", ""))
     r["authors|;|"] = _clean_text(r.get("authors|;|", ""))
     r["doi"] = _normalize_doi(r.get("doi"))
+
+    # First author last (for blocking); safe if authors|;| is absent/empty
+    if not r.get("first_author_last"):
+        r["first_author_last"] = _first_author_last(r.get("authors|;|", "")) or ""
+
+    # Normalized title + prefix (used only inside dedupe; no need to emit both)
+    r["_norm_title"] = _norm_title(r.get("title", ""))
+    r["_title_prefix"] = _title_prefix_key(r["_norm_title"])
+
     # Trim url whitespace/control chars but don't over-process
     url = (r.get("url") or "").strip()
     url = re.sub(r"[\x00-\x1F\x7F]", "", url)
     r["url"] = url
     return r
+
 
 def _max_pages(engine: str) -> int:
     # Allow engine-specific override, else global, else 10
@@ -424,6 +600,176 @@ def _max_pages(engine: str) -> int:
     except Exception:
         pass
     return 10
+
+def _filter_kwargs_for_fn(fetch_fn, kwargs: dict) -> dict:
+    """
+    Keep only kwargs that the target function actually accepts.
+    Prevents TypeError: got an unexpected keyword argument 'page'/ 'offset' / etc.
+    """
+    try:
+        import inspect
+        sig = inspect.signature(fetch_fn)
+        allowed = set(sig.parameters.keys())
+        return {k: v for k, v in (kwargs or {}).items() if k in allowed}
+    except Exception:
+        # If introspection fails, pass only the bare minimum common args
+        safe = {}
+        for k in ("run_id", "q", "term_origin", "per_page", "rows", "max_results", "retmax", "limit", "max_pages"):
+            if k in kwargs:
+                safe[k] = kwargs[k]
+        return safe
+
+
+def _effective_per_source(per_source: int, engine: str) -> int:
+    """
+    Final per-engine cap. Prefers env overrides if larger.
+    - LIT_PER_SOURCE_MAX applies globally.
+    - LIT_<ENGINE>_PER_SOURCE_MAX applies per engine (e.g., LIT_PUBMED_PER_SOURCE_MAX).
+    Defaults to a very high limit to avoid silently truncating recall.
+    """
+    try:
+        eng_key = f"LIT_{engine.upper()}_PER_SOURCE_MAX"
+        env_eng = int(os.getenv(eng_key, "0") or "0")
+        env_global = int(os.getenv("LIT_PER_SOURCE_MAX", "0") or "0")
+    except Exception:
+        env_eng = 0
+        env_global = 0
+    hard_default = 100000  # super-high cap that you asked for
+    cap = max(per_source or 0, env_global, env_eng, hard_default)
+    return cap
+
+
+def _engine_page_size(engine: str, remaining: int) -> int:
+    """
+    Decide a sensible page size per engine while respecting remaining budget.
+    Tuned conservatively to stay within public API norms.
+    """
+    e = (engine or "").lower()
+    # Safe upper-bounds per call
+    defaults = {
+        "openalex": 200,        # cursor pages up to ~200
+        "crossref": 1000,       # Crossref rows can be large; 1000 is safe & performant
+        "arxiv": 200,           # arXiv returns 200/page comfortably
+        "pubmed": 10000,        # ESearch/EFetch can handle large retmax; still govern by STOP
+        "semanticscholar": 100  # S2 Graph API: typical public cap ~100/page
+    }
+    page_size = defaults.get(e, 200)
+    if remaining > 0:
+        page_size = min(page_size, remaining)
+    return max(1, page_size)
+
+def _call_source_positional(fetch_fn, run_id: str, q: str, term_origin: str, **kwargs):
+    """
+    Call source with the first three args positionally to match legacy SRC signatures.
+    Remaining parameters (per_page/rows/retmax/limit/page/offset/max_pages, etc.) go as kwargs.
+    """
+    return fetch_fn(run_id, q, term_origin, **kwargs)
+
+
+def _page_loop(fetch_fn, engine: str, run_id: str, query: str, term_origin: str,
+               base_kwargs: dict, size_param: str,
+               max_pages: int, per_source_cap: int, results_log_path: str,
+               queries_log_path: str, engine_attempts, engine_success) -> list:
+    """
+    Generic pagination loop that repeatedly calls the engine fetch function.
+
+    IMPORTANT: We pass (run_id, query, term_origin) POSITIONALLY to preserve the
+    original SRC.search_* calling convention. Only paging knobs go as kwargs.
+
+    SAFETY:
+      - Only pass kwargs the function accepts (signature-aware).
+      - Stop if no growth in unique items to avoid infinite loops on non-paginating sources.
+    """
+    if not (query or "").strip():
+        _write_log_line(results_log_path, f"[{engine}] SKIP | empty query")
+        return []
+
+    rows: list = []
+    page = 1
+    offset = 0
+    seen_keys = set()  # to detect growth; work_id/doi/title tuple
+
+    # We’ll compute page_size per iteration based on remaining budget
+    while True:
+        if _should_stop(os.getenv("LIT_STOP_FLAG_PATH", "")):
+            _write_log_line(results_log_path, f"[{engine}] STOP requested; halting pagination.")
+            break
+        if len(rows) >= per_source_cap:
+            _write_log_line(results_log_path, f"[{engine}] per_source_cap reached ({per_source_cap}); halting.")
+            break
+        if page > max_pages:
+            _write_log_line(results_log_path, f"[{engine}] max_pages reached ({max_pages}); halting.")
+            break
+
+        remaining = max(0, per_source_cap - len(rows))
+        page_size = _engine_page_size(engine, remaining)
+
+        # Compose kwargs for this call
+        kwargs = dict(base_kwargs or {})
+        kwargs[size_param] = page_size
+        kwargs.setdefault("page", page)
+        kwargs.setdefault("offset", offset)
+        # Only send kwargs the function can accept
+        kwargs = _filter_kwargs_for_fn(fetch_fn, kwargs)
+
+        engine_attempts[engine] += 1
+        t0 = time.time()
+        try:
+            res = _call_source_positional(fetch_fn, run_id, query, term_origin, **kwargs) or []
+            n = len(res)
+            secs = time.time() - t0
+            _write_log_line(results_log_path, f"[{engine}] OK | page={page} size={page_size} rows={n} | {secs:.2f}s | {query}")
+            engine_success[engine] += 1
+        except TypeError as e:
+            # Signature mismatch: retry WITHOUT page/offset entirely
+            try:
+                kwargs2 = {k: v for k, v in kwargs.items() if k not in ("page", "offset")}
+                res = _call_source_positional(fetch_fn, run_id, query, term_origin, **kwargs2) or []
+                n = len(res)
+                secs = time.time() - t0
+                _write_log_line(results_log_path, f"[{engine}] OK(no-page) | size={page_size} rows={n} | {secs:.2f}s | {query} | note: {e}")
+                engine_success[engine] += 1
+            except Exception as e2:
+                secs = time.time() - t0
+                _write_log_line(results_log_path, f"[{engine}] ERR | size={page_size} | {secs:.2f}s | {query} | {type(e2).__name__}: {e2}")
+                break
+        except Exception as e:
+            secs = time.time() - t0
+            _write_log_line(results_log_path, f"[{engine}] ERR | page={page} size={page_size} | {secs:.2f}s | {query} | {type(e).__name__}: {e}")
+            break
+
+        if not res:
+            # Nothing returned → stop
+            break
+
+        # Append only new items to detect growth for pagination safety
+        new_any = False
+        for r in res:
+            doi = ((r or {}).get("doi") or "").strip().lower()
+            wid = ((r or {}).get("work_id") or "").strip().lower()
+            title = _norm_title((r or {}).get("title") or "")
+            key = (doi, wid, title)
+            if key not in seen_keys:
+                seen_keys.add(key)
+                rows.append(r)
+                new_any = True
+
+        # If we got fewer than requested OR no new unique items, stop
+        if len(res) < page_size or not new_any:
+            break
+
+        page += 1
+        offset += len(res)
+
+    return rows
+
+def _log_fetch_signature(fetch_fn, engine: str, results_log_path: str):
+    try:
+        import inspect
+        allowed = sorted(list(inspect.signature(fetch_fn).parameters.keys()))
+        _write_log_line(results_log_path, f"[{engine}] accepts kwargs: {allowed}")
+    except Exception:
+        pass
 
 
 def _ensure_csv2_header(path: str):
@@ -441,10 +787,14 @@ def _ensure_csv2_header(path: str):
         w.writeheader()
 
 
+# Include a convenience column for blocking/dedup:
+# - first_author_last: cleaned last name of first author (if parseable)
 CSV2_HEADER = [
     "run_id","engine","query","term_origin","work_id","title","authors|;|",
-    "year","venue","doi","url","abstract","source_score"
+    "year","venue","doi","url","abstract","source_score",
+    "first_author_last"
 ]
+
 
 
 from dataclasses import dataclass
@@ -645,24 +995,101 @@ def _merge_records(rows: List[Dict[str, str]]) -> Dict[str, str]:
 
 def _merge_dedupe(rows: List[Dict[str,str]]) -> List[Dict[str,str]]:
     """
-    Group by DOI (if present) else (title.lower, year) and merge each group.
+    Two-stage, efficient dedup:
+      1) Group by DOI (exact) → merge
+      2) For items without DOI, block by:
+         a) (first_author_last, year), and
+         b) title prefix (first N chars of normalized title)
+         Then run fuzzy compare WITHIN each block (threshold env: LIT_FUZZY_THRESH, default 0.88).
+    This massively reduces pairwise comparisons while preserving duplicate recall
+    (esp. DOI/no-DOI variants of the same paper).
     """
-    groups: Dict[Tuple, List[Dict[str,str]]] = {}
-    for r in rows:
-        r = _normalize_row(r)
-        doi = (r.get("doi") or "").strip().lower()
-        if doi:
-            key = ("doi", doi)
-        else:
-            title = (r.get("title") or "").strip().lower()
-            year = (r.get("year") or "").strip()
-            key = ("title_year", title, year)
-        groups.setdefault(key, []).append(r)
+    # Normalize and split by DOI present vs absent
+    with_doi: Dict[str, List[Dict[str,str]]] = {}
+    no_doi: List[Dict[str,str]] = []
 
-    merged = []
-    for _k, bucket in groups.items():
+    for r in rows:
+        rr = _normalize_row(r)
+        doi = rr.get("doi", "")
+        if doi:
+            with_doi.setdefault(doi, []).append(rr)
+        else:
+            no_doi.append(rr)
+
+    merged: List[Dict[str,str]] = []
+
+    # --- Stage 1: DOI merges (fast path)
+    for doi, bucket in with_doi.items():
         merged.append(_merge_records(bucket))
+
+    if not no_doi:
+        return merged
+
+    # Threshold tuning via env
+    try:
+        FUZZY_THRESH = float(os.getenv("LIT_FUZZY_THRESH", "0.88"))
+    except Exception:
+        FUZZY_THRESH = 0.88
+
+    # --- Stage 2: Block non-DOI items
+    # Primary block: (first_author_last, year)
+    # Secondary block inside that: _title_prefix
+    primary_blocks: Dict[tuple, List[Dict[str,str]]] = {}
+    for rr in no_doi:
+        key = (
+            (rr.get("first_author_last") or ""),
+            (rr.get("year") or "").strip()
+        )
+        primary_blocks.setdefault(key, []).append(rr)
+
+    # Merge each primary block
+    for primary_key, p_bucket in primary_blocks.items():
+        if len(p_bucket) == 1:
+            merged.append(p_bucket[0])
+            continue
+
+        # Secondary blocks by title prefix
+        secondary: Dict[str, List[Dict[str,str]]] = {}
+        for rr in p_bucket:
+            secondary.setdefault(rr.get("_title_prefix", ""), []).append(rr)
+
+        # For each secondary bucket, do local fuzzy clustering
+        for sec_key, s_bucket in secondary.items():
+            if len(s_bucket) == 1:
+                merged.append(s_bucket[0])
+                continue
+
+            # Greedy clustering: pick a seed, pull in all above threshold, merge → repeat
+            s_bucket = list(s_bucket)  # shallow copy
+            visited = [False] * len(s_bucket)
+
+            for i in range(len(s_bucket)):
+                if visited[i]:
+                    continue
+                seed = s_bucket[i]
+                cluster = [seed]
+                visited[i] = True
+                t0 = seed.get("_norm_title", "")
+                for j in range(i + 1, len(s_bucket)):
+                    if visited[j]:
+                        continue
+                    cand = s_bucket[j]
+                    # Require same year and strong title similarity
+                    sim = _fuzzy_sim(t0, cand.get("_norm_title", ""))
+                    if sim >= FUZZY_THRESH:
+                        cluster.append(cand)
+                        visited[j] = True
+                if len(cluster) == 1:
+                    merged.append(seed)
+                else:
+                    merged.append(_merge_records(cluster))
+
+    # Final clean-up: drop transient internal fields before writing
+    for r in merged:
+        r.pop("_norm_title", None)
+        r.pop("_title_prefix", None)
     return merged
+
 
 
 def _build_simple_queries(spec: QuerySpec, max_single: int = 30, max_pairs: int = 30) -> List[str]:
@@ -849,6 +1276,23 @@ def run(
             print(f"[io] could not create unique attempt dir for {key}: {e}")
     _dbg(f"Writing outputs to unique attempt folder: csv={paths['csv']} raw={paths['raw']} logs={paths['logs']}")
 
+    # Summarize a few relevant env knobs we rely on (debug-only)
+    try:
+        _dbg("Env summary: "
+             f"LIT_RATE_LIMIT_SEC={os.getenv('LIT_RATE_LIMIT_SEC', '')} "
+             f"LIT_MAX_PAGES={os.getenv('LIT_MAX_PAGES', '')} "
+             f"LIT_OPENALEX_MAX_PAGES={os.getenv('LIT_OPENALEX_MAX_PAGES', '')} "
+             f"LIT_PER_SOURCE_MAX={os.getenv('LIT_PER_SOURCE_MAX', '')} "
+             f"LIT_OPENALEX_PER_SOURCE_MAX={os.getenv('LIT_OPENALEX_PER_SOURCE_MAX', '')} "
+             f"LIT_CROSSREF_PER_SOURCE_MAX={os.getenv('LIT_CROSSREF_PER_SOURCE_MAX', '')} "
+             f"LIT_ARXIV_PER_SOURCE_MAX={os.getenv('LIT_ARXIV_PER_SOURCE_MAX', '')} "
+             f"LIT_PUBMED_PER_SOURCE_MAX={os.getenv('LIT_PUBMED_PER_SOURCE_MAX', '')} "
+             f"LIT_SEMANTICSCHOLAR_PER_SOURCE_MAX={os.getenv('LIT_SEMANTICSCHOLAR_PER_SOURCE_MAX', '')} "
+             f"LIT_PUBMED_RELAXED={os.getenv('LIT_PUBMED_RELAXED', '')} "
+             f"LIT_PUBMED_ANY_CHUNK={os.getenv('LIT_PUBMED_ANY_CHUNK', '')}"
+             )
+    except Exception:
+        pass
 
     queries_log_path = os.path.join(paths["logs"], "queries_emitted.log")
     results_log_path = os.path.join(paths["logs"], "results_summary.log")
@@ -986,33 +1430,37 @@ def run(
             if "OpenAlex" in engines:
                 try:
                     engine = "OpenAlex"
-                    new_rows: List[Dict[str,str]] = []
+                    new_rows: List[Dict[str, str]] = []
+                    cap = _effective_per_source(per_source, engine)
                     for q in _plan_queries_staged(engine, spec, base_q_clean):
                         if _should_stop(stop_flag_path): break
+                        if len(new_rows) >= cap: break
 
-                        if len(new_rows) >= per_source: break
                         _log_query(engine, q)
-                        engine_attempts[engine] += 1
-                        t0 = time.time()
-                        try:
-                            r = SRC.search_openalex(
-                                run_id, q, term_origin,
-                                per_page=min(per_source - len(new_rows), 200),  # cursor pages up to 200
+                        base_kwargs = dict(run_id=run_id, q=q, term_origin=term_origin,
+                                           per_page=_engine_page_size(engine, cap - len(new_rows)),
+                                           max_pages=_max_pages("OpenAlex"))
+                        rows_pagewise = _page_loop(
+                            fetch_fn=SRC.search_openalex,
+                            engine=engine,
+                            run_id=run_id,
+                            query=q,
+                            term_origin=term_origin,
+                            base_kwargs=dict(
+                                per_page=_engine_page_size(engine, cap - len(new_rows)),
                                 max_pages=_max_pages("OpenAlex")
-                            )
-                            n = len(r or [])
-                            secs = time.time() - t0
-                            _write_log_line(results_log_path, f"[{engine}] OK | {n} rows | {secs:.2f}s | {q}")
-                            _dbg(f"{engine} OK {n} rows in {secs:.2f}s :: {q}")
-                            engine_success[engine] += 1
-                        except Exception as e:
-                            secs = time.time() - t0
-                            _write_log_line(results_log_path, f"[{engine}] ERR | 0 rows | {secs:.2f}s | {q} | {type(e).__name__}: {e}")
-                            _dbg(f"{engine} ERR {secs:.2f}s :: {type(e).__name__}: {e} :: {q}")
-                            r = None
+                            ),
+                            size_param="per_page",
+                            max_pages=_max_pages("OpenAlex"),
+                            per_source_cap=cap - len(new_rows),
+                            results_log_path=results_log_path,
+                            queries_log_path=queries_log_path,
+                            engine_attempts=engine_attempts,
+                            engine_success=engine_success
+                        )
 
-                        r = _force_engine(r, engine)
-                        new_rows += (r or [])
+                        new_rows += rows_pagewise
+
                     new_rows = [_normalize_row(r) for r in (new_rows or [])]
                     collected += new_rows
                     engine_counts[engine] += len(new_rows)
@@ -1025,7 +1473,6 @@ def run(
                     if _should_stop(stop_flag_path):
                         _dbg(f"Stop requested after {engine} block; exiting early.")
                         return True
-
                 except Exception as e:
                     engine_errors["OpenAlex"] += 1
                     print(f"[collect][OpenAlex] error: {e}")
@@ -1033,32 +1480,35 @@ def run(
             if "Crossref" in engines:
                 try:
                     engine = "Crossref"
-                    new_rows: List[Dict[str,str]] = []
+                    new_rows: List[Dict[str, str]] = []
+                    cap = _effective_per_source(per_source, engine)
                     for q in _plan_queries_staged(engine, spec, base_q_clean):
                         if _should_stop(stop_flag_path): break
+                        if len(new_rows) >= cap: break
 
-                        if len(new_rows) >= per_source: break
                         _log_query(engine, q)
-                        engine_attempts[engine] += 1
-                        t0 = time.time()
-                        try:
-                            r = SRC.search_crossref(
-                                run_id, q, term_origin,
-                                rows=min(per_source - len(new_rows), 50)
-                            )
-                            n = len(r or [])
-                            secs = time.time() - t0
-                            _write_log_line(results_log_path, f"[{engine}] OK | {n} rows | {secs:.2f}s | {q}")
-                            _dbg(f"{engine} OK {n} rows in {secs:.2f}s :: {q}")
-                            engine_success[engine] += 1
-                        except Exception as e:
-                            secs = time.time() - t0
-                            _write_log_line(results_log_path, f"[{engine}] ERR | 0 rows | {secs:.2f}s | {q} | {type(e).__name__}: {e}")
-                            _dbg(f"{engine} ERR {secs:.2f}s :: {type(e).__name__}: {e} :: {q}")
-                            r = None
+                        base_kwargs = dict(run_id=run_id, q=q, term_origin=term_origin,
+                                           rows=_engine_page_size(engine, cap - len(new_rows)))
+                        rows_pagewise = _page_loop(
+                            fetch_fn=SRC.search_crossref,
+                            engine=engine,
+                            run_id=run_id,
+                            query=q,
+                            term_origin=term_origin,
+                            base_kwargs=dict(
+                                rows=_engine_page_size(engine, cap - len(new_rows))
+                            ),
+                            size_param="rows",
+                            max_pages=_max_pages("Crossref"),
+                            per_source_cap=cap - len(new_rows),
+                            results_log_path=results_log_path,
+                            queries_log_path=queries_log_path,
+                            engine_attempts=engine_attempts,
+                            engine_success=engine_success
+                        )
 
-                        r = _force_engine(r, engine)
-                        new_rows += (r or [])
+                        new_rows += rows_pagewise
+
                     new_rows = [_normalize_row(r) for r in (new_rows or [])]
                     collected += new_rows
                     engine_counts[engine] += len(new_rows)
@@ -1071,7 +1521,6 @@ def run(
                     if _should_stop(stop_flag_path):
                         _dbg(f"Stop requested after {engine} block; exiting early.")
                         return True
-
                 except Exception as e:
                     engine_errors["Crossref"] += 1
                     print(f"[collect][Crossref] error: {e}")
@@ -1079,33 +1528,36 @@ def run(
             if "arXiv" in engines:
                 try:
                     engine = "arXiv"
-                    new_rows: List[Dict[str,str]] = []
+                    new_rows: List[Dict[str, str]] = []
+                    cap = _effective_per_source(per_source, engine)
                     # IMPORTANT: do NOT simplify; use planner output
                     for q in _plan_queries_staged(engine, spec, base_q_clean):
                         if _should_stop(stop_flag_path): break
+                        if len(new_rows) >= cap: break
 
-                        if len(new_rows) >= per_source: break
                         _log_query(engine, q)
-                        engine_attempts[engine] += 1
-                        t0 = time.time()
-                        try:
-                            r = SRC.search_arxiv(
-                                run_id, q, term_origin,
-                                max_results=min(per_source - len(new_rows), 50)
-                            )
-                            n = len(r or [])
-                            secs = time.time() - t0
-                            _write_log_line(results_log_path, f"[{engine}] OK | {n} rows | {secs:.2f}s | {q}")
-                            _dbg(f"{engine} OK {n} rows in {secs:.2f}s :: {q}")
-                            engine_success[engine] += 1
-                        except Exception as e:
-                            secs = time.time() - t0
-                            _write_log_line(results_log_path, f"[{engine}] ERR | 0 rows | {secs:.2f}s | {q} | {type(e).__name__}: {e}")
-                            _dbg(f"{engine} ERR {secs:.2f}s :: {type(e).__name__}: {e} :: {q}")
-                            r = None
+                        base_kwargs = dict(run_id=run_id, q=q, term_origin=term_origin,
+                                           max_results=_engine_page_size(engine, cap - len(new_rows)))
+                        rows_pagewise = _page_loop(
+                            fetch_fn=SRC.search_arxiv,
+                            engine=engine,
+                            run_id=run_id,
+                            query=q,
+                            term_origin=term_origin,
+                            base_kwargs=dict(
+                                max_results=_engine_page_size(engine, cap - len(new_rows))
+                            ),
+                            size_param="max_results",
+                            max_pages=_max_pages("arXiv"),
+                            per_source_cap=cap - len(new_rows),
+                            results_log_path=results_log_path,
+                            queries_log_path=queries_log_path,
+                            engine_attempts=engine_attempts,
+                            engine_success=engine_success
+                        )
 
-                        r = _force_engine(r, engine)
-                        new_rows += (r or [])
+                        new_rows += rows_pagewise
+
                     new_rows = [_normalize_row(r) for r in (new_rows or [])]
                     collected += new_rows
                     engine_counts[engine] += len(new_rows)
@@ -1118,7 +1570,6 @@ def run(
                     if _should_stop(stop_flag_path):
                         _dbg(f"Stop requested after {engine} block; exiting early.")
                         return True
-
                 except Exception as e:
                     engine_errors["arXiv"] += 1
                     print(f"[collect][arXiv] error: {e}")
@@ -1126,33 +1577,36 @@ def run(
             if "PubMed" in engines:
                 try:
                     engine = "PubMed"
-                    new_rows: List[Dict[str,str]] = []
-                    # IMPORTANT: do NOT simplify; use planner output with field tags
+                    new_rows: List[Dict[str, str]] = []
+                    cap = _effective_per_source(per_source, engine)
+                    # IMPORTANT: keep planner output (now strict+relaxed) and walk pages
                     for q in _plan_queries_staged(engine, spec, base_q_clean):
                         if _should_stop(stop_flag_path): break
+                        if len(new_rows) >= cap: break
 
-                        if len(new_rows) >= per_source: break
                         _log_query(engine, q)
-                        engine_attempts[engine] += 1
-                        t0 = time.time()
-                        try:
-                            r = SRC.search_pubmed(
-                                run_id, q, term_origin,
-                                retmax=min(per_source - len(new_rows), 50)
-                            )
-                            n = len(r or [])
-                            secs = time.time() - t0
-                            _write_log_line(results_log_path, f"[{engine}] OK | {n} rows | {secs:.2f}s | {q}")
-                            _dbg(f"{engine} OK {n} rows in {secs:.2f}s :: {q}")
-                            engine_success[engine] += 1
-                        except Exception as e:
-                            secs = time.time() - t0
-                            _write_log_line(results_log_path, f"[{engine}] ERR | 0 rows | {secs:.2f}s | {q} | {type(e).__name__}: {e}")
-                            _dbg(f"{engine} ERR {secs:.2f}s :: {type(e).__name__}: {e} :: {q}")
-                            r = None
+                        base_kwargs = dict(run_id=run_id, q=q, term_origin=term_origin,
+                                           retmax=_engine_page_size(engine, cap - len(new_rows)))
+                        rows_pagewise = _page_loop(
+                            fetch_fn=SRC.search_pubmed,
+                            engine=engine,
+                            run_id=run_id,
+                            query=q,
+                            term_origin=term_origin,
+                            base_kwargs=dict(
+                                retmax=_engine_page_size(engine, cap - len(new_rows))
+                            ),
+                            size_param="retmax",
+                            max_pages=_max_pages("PubMed"),
+                            per_source_cap=cap - len(new_rows),
+                            results_log_path=results_log_path,
+                            queries_log_path=queries_log_path,
+                            engine_attempts=engine_attempts,
+                            engine_success=engine_success
+                        )
 
-                        r = _force_engine(r, engine)
-                        new_rows += (r or [])
+                        new_rows += rows_pagewise
+
                     new_rows = [_normalize_row(r) for r in (new_rows or [])]
                     collected += new_rows
                     engine_counts[engine] += len(new_rows)
@@ -1165,7 +1619,6 @@ def run(
                     if _should_stop(stop_flag_path):
                         _dbg(f"Stop requested after {engine} block; exiting early.")
                         return True
-
                 except Exception as e:
                     engine_errors["PubMed"] += 1
                     print(f"[collect][PubMed] error: {e}")
@@ -1173,32 +1626,35 @@ def run(
             if "SemanticScholar" in engines:
                 try:
                     engine = "SemanticScholar"
-                    new_rows: List[Dict[str,str]] = []
+                    new_rows: List[Dict[str, str]] = []
+                    cap = _effective_per_source(per_source, engine)
                     for q in _plan_queries_staged(engine, spec, base_q_clean):
                         if _should_stop(stop_flag_path): break
+                        if len(new_rows) >= cap: break
 
-                        if len(new_rows) >= per_source: break
                         _log_query(engine, q)
-                        engine_attempts[engine] += 1
-                        t0 = time.time()
-                        try:
-                            r = SRC.search_semantic_scholar(
-                                run_id, q, term_origin,
-                                limit=min(per_source - len(new_rows), 50)
-                            )
-                            n = len(r or [])
-                            secs = time.time() - t0
-                            _write_log_line(results_log_path, f"[{engine}] OK | {n} rows | {secs:.2f}s | {q}")
-                            _dbg(f"{engine} OK {n} rows in {secs:.2f}s :: {q}")
-                            engine_success[engine] += 1
-                        except Exception as e:
-                            secs = time.time() - t0
-                            _write_log_line(results_log_path, f"[{engine}] ERR | 0 rows | {secs:.2f}s | {q} | {type(e).__name__}: {e}")
-                            _dbg(f"{engine} ERR {secs:.2f}s :: {type(e).__name__}: {e} :: {q}")
-                            r = None
+                        base_kwargs = dict(run_id=run_id, q=q, term_origin=term_origin,
+                                           limit=_engine_page_size(engine, cap - len(new_rows)))
+                        rows_pagewise = _page_loop(
+                            fetch_fn=SRC.search_semantic_scholar,
+                            engine=engine,
+                            run_id=run_id,
+                            query=q,
+                            term_origin=term_origin,
+                            base_kwargs=dict(
+                                limit=_engine_page_size(engine, cap - len(new_rows))
+                            ),
+                            size_param="limit",
+                            max_pages=_max_pages("SemanticScholar"),
+                            per_source_cap=cap - len(new_rows),
+                            results_log_path=results_log_path,
+                            queries_log_path=queries_log_path,
+                            engine_attempts=engine_attempts,
+                            engine_success=engine_success
+                        )
 
-                        r = _force_engine(r, engine)
-                        new_rows += (r or [])
+                        new_rows += rows_pagewise
+
                     new_rows = [_normalize_row(r) for r in (new_rows or [])]
                     collected += new_rows
                     engine_counts[engine] += len(new_rows)
@@ -1211,7 +1667,6 @@ def run(
                     if _should_stop(stop_flag_path):
                         _dbg(f"Stop requested after {engine} block; exiting early.")
                         return True
-
                 except Exception as e:
                     engine_errors["SemanticScholar"] += 1
                     print(f"[collect][SemanticScholar] error: {e}")
