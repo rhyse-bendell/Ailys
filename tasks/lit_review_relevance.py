@@ -219,6 +219,19 @@ def _unique_attempt_dirs(paths: Dict[str,str]) -> Dict[str,str]:
         out[k] = p
     return out
 
+# === Triage passthrough (zero-LLM splitter) ==================================
+def triage_candidates(input_csv_path: str, save_prefix: str | None = None) -> tuple[bool, str]:
+    """
+    Convenience wrapper to route candidates into ready_to_rank vs requires_amendment,
+    writing outputs next to `input_csv_path` under a <prefix>/ subfolder.
+    """
+    try:
+        from tasks.lit_triage import run_triage as _triage
+    except Exception as e:
+        return False, f"Could not import triage task: {e}"
+    return _triage(input_csv=input_csv_path, save_prefix=save_prefix or "relevance")
+
+
 def run(
     csv1_path: str,                      # prompt_to_keywords.csv
     collected_csv_path: Optional[str]=None,  # defaults to search_results_final.csv in run dirs
