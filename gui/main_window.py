@@ -13,6 +13,8 @@ from PySide6.QtCore import Qt, QThread, Signal, QTimer
 
 
 from tasks.literature_review import run as run_litreview
+from tasks.lit_search_collect import run_dedupe_only
+
 from core.batch import run_batch_litreview
 from memory_loader import load_reviews_to_memory
 from tasks.chat import ChatSession
@@ -115,6 +117,17 @@ class AilysGUI(QWidget):
         self.global_busy.setVisible(False)
         right_layout.addWidget(self.global_busy)
 
+        # ---- Global busy indicator (non-blocking) ----
+        self.global_busy = QProgressBar()
+        self.global_busy.setRange(0, 0)           # marquee
+        self.global_busy.setTextVisible(True)      # show label text while busy
+        self.global_busy.setVisible(False)
+        right_layout.addWidget(self.global_busy)
+
+        # Track how many concurrent tasks are running so we can keep the spinner on
+        # even if one subtask ends while others are still going.
+        self._busy_active_count = 0
+
         # List of pending approvals
         self.approvals_list = QListWidget()
         right_layout.addWidget(self.approvals_list, 1)
@@ -194,10 +207,10 @@ class AilysGUI(QWidget):
         self.create_api_config_tab()
 
         self.create_lit_search_tab()
-        self.create_lit_relevance_tab()
+        self.create_lit_relevance_tab()  # renamed inside to "Lit Rank/Pull"
 
-        self.create_literature_tab()
-        self.create_batch_tab()
+        self.create_literature_tab()  # now includes Batch controls
+        # self.create_batch_tab()         # merged into Literature Review tab
 
         self.create_chat_tab()
 
@@ -215,6 +228,11 @@ class AilysGUI(QWidget):
 
     # ---------- Global busy guard ----------
     def _busy_start(self, msg: str = "Working..."):
+        # increment active task count
+        try:
+            self._busy_active_count += 1
+        except Exception:
+            self._busy_active_count = 1
         try:
             self.global_busy.setFormat(msg)
             self.global_busy.setVisible(True)
@@ -231,6 +249,28 @@ class AilysGUI(QWidget):
             pass
 
     def _busy_stop(self):
+        # decrement active task count, but don't hide if approvals are pending
+        try:
+            self._busy_active_count = max(0, int(self._busy_active_count) - 1)
+        except Exception:
+            self._busy_active_count = 0
+
+        # If any tasks still running, keep spinner with last label
+        if self._busy_active_count > 0:
+            return
+
+        # No active tasks; if approvals pending, keep spinner on with an approvals label
+        try:
+            pending = approvals.approval_queue.get_pending_requests()
+            if pending:
+                self.global_busy.setFormat(f"Waiting for approvals… ({len(pending)})")
+                self.global_busy.setVisible(True)
+                # Do not re-enable tabs/cursor here; user is interacting anyway
+                return
+        except Exception:
+            pass
+
+        # Fully idle → hide spinner and restore UI
         try:
             self.global_busy.setVisible(False)
         except Exception:
@@ -243,6 +283,32 @@ class AilysGUI(QWidget):
             self.tabs.setEnabled(True)
         except Exception:
             pass
+
+    def _attach_busy(self, thread: QThread, label: str):
+        """Attach spinner lifecycle to any QThread with a human-readable label."""
+        try:
+            thread.started.connect(lambda: self._busy_start(label))
+            # QThread.finished emits (no args); our TaskRunnerThread.finished emits (bool,str).
+            # Connect both safely:
+            try:
+                thread.finished.connect(lambda *_: self._busy_stop())
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+    def _maybe_busy_for_approvals(self):
+        """Keep spinner visible when approvals are pending, even if no task thread is running."""
+        try:
+            pending = approvals.approval_queue.get_pending_requests()
+            if pending and self._busy_active_count == 0:
+                self.global_busy.setFormat(f"Waiting for approvals… ({len(pending)})")
+                self.global_busy.setVisible(True)
+            elif not pending and self._busy_active_count == 0:
+                self.global_busy.setVisible(False)
+        except Exception:
+            pass
+
 
     # ----------------- Common helpers -----------------
 
@@ -365,6 +431,7 @@ class AilysGUI(QWidget):
 
             self._approve_thread = TaskRunnerThread(_do_approve)
             self._approve_thread.update_status.connect(self.chat_log.append)
+            self._attach_busy(self._approve_thread, "Approving request…")
 
             def _done(ok, msg):
                 # Do not toggle button enabled states; simply refresh list + show status.
@@ -400,6 +467,7 @@ class AilysGUI(QWidget):
 
             self._deny_thread = TaskRunnerThread(_do_deny)
             self._deny_thread.update_status.connect(self.chat_log.append)
+            self._attach_busy(self._deny_thread, "Denying request…")
 
             def _done(ok, msg):
                 self.chat_log.append(("✅ " if ok else "⚠️ ") + msg)
@@ -458,8 +526,12 @@ class AilysGUI(QWidget):
                     pass
             self._last_pending_count = count
 
+
         # update list using the selection-preserving refresh
         self.refresh_approvals_pane()
+        # Keep the spinner reflecting approvals-only idle state
+        self._maybe_busy_for_approvals()
+
 
     def ask_ks_mode(self, title: str = "Select source mode"):
         """
@@ -713,7 +785,7 @@ class AilysGUI(QWidget):
         layout.addWidget(augBox)
 
         # 4) Manuscript collection using a chosen keywords CSV -----------------------
-        colBox = QGroupBox("Collect Manuscripts (Guided by Keywords CSV)")
+        colBox = QGroupBox("Collect Candidate Records (Guided by Keywords CSV)")
         cLay = QVBoxLayout(colBox)
 
         cRow = QHBoxLayout()
@@ -730,13 +802,13 @@ class AilysGUI(QWidget):
         layout.addWidget(colBox)
 
         # Optional future steps
-        self.btn_ls_filter = QPushButton("Filter to Consider (CSV-3)")
-        self.btn_ls_filter.setEnabled(False)
-        self.btn_ls_open = QPushButton("Open Output Folder")
-        self.btn_ls_open.setEnabled(False)
-        layout.addWidget(self.btn_ls_filter)
-        layout.addWidget(self.btn_ls_open)
-        self.btn_ls_open.clicked.connect(self.open_ls_output_folder)
+#        self.btn_ls_filter = QPushButton("Filter to Consider (CSV-3)")
+#        self.btn_ls_filter.setEnabled(False)
+#        self.btn_ls_open = QPushButton("Open Output Folder")
+#        self.btn_ls_open.setEnabled(False)
+#        layout.addWidget(self.btn_ls_filter)
+#        layout.addWidget(self.btn_ls_open)
+#        self.btn_ls_open.clicked.connect(self.open_ls_output_folder)
 
 
         # Browse handlers
@@ -768,7 +840,7 @@ class AilysGUI(QWidget):
     def create_lit_relevance_tab(self):
         """
         Stage C – Relevance scoring (CSV-2 → rank-ordered CSV for PDF pulls).
-        Uses tasks/lit_review_relevance.run (approval-gated via artificial cognition).
+        Also: Pull PDFs for a ranked/edited CSV using tasks/lit_search_pull.run.
         """
         from PySide6.QtWidgets import (
             QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QTextEdit,
@@ -780,8 +852,41 @@ class AilysGUI(QWidget):
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(10)
 
-        # Inputs group
-        ibox = QGroupBox("Inputs")
+        # ------------------- Relevance inputs -------------------
+        # ------------------- Dedupe-only UI -------------------
+        dedupe_box = QGroupBox("De-duplicate an Existing CSV → FINAL")
+        d_lay = QVBoxLayout(dedupe_box)
+
+        drow1 = QHBoxLayout()
+        self.dedupe_input_csv = QLineEdit()
+        self.dedupe_input_csv.setPlaceholderText("Path to large CSV (e.g., checkpoint/raw/combined)")
+        btn_browse_dedupe_in = QPushButton("Browse…")
+        drow1.addWidget(QLabel("Input CSV:"))
+        drow1.addWidget(self.dedupe_input_csv)
+        drow1.addWidget(btn_browse_dedupe_in)
+        d_lay.addLayout(drow1)
+
+        drow2 = QHBoxLayout()
+        self.dedupe_output_dir = QLineEdit()
+        self.dedupe_output_dir.setPlaceholderText("Optional: output folder (default = same folder as input)")
+        btn_browse_dedupe_out = QPushButton("Choose…")
+        drow2.addWidget(QLabel("Output Folder:"))
+        drow2.addWidget(self.dedupe_output_dir)
+        drow2.addWidget(btn_browse_dedupe_out)
+        d_lay.addLayout(drow2)
+
+        self.btn_run_dedupe_only = QPushButton("Run De-duplication (NO LLM TOKENS)")
+        d_lay.addWidget(self.btn_run_dedupe_only)
+
+        # Note about scale
+        d_lay.addWidget(QLabel(
+            "Note: handles very large CSVs, but RAM usage will scale with rows. "
+            "The final file is written as 'search_results_final.csv'"
+        ))
+
+        layout.addWidget(dedupe_box)
+
+        ibox = QGroupBox("Rank / Relevance (CSV-2 → Ranked)")
         ilay = QVBoxLayout(ibox)
 
         # CSV-1 (prompt_to_keywords.csv)
@@ -794,17 +899,17 @@ class AilysGUI(QWidget):
         row1.addWidget(btn_browse_csv1)
         ilay.addLayout(row1)
 
-        # Collected CSV (optional, defaults to search_results_final.csv in the run’s CSV folder)
+        # Collected CSV (optional)
         row2 = QHBoxLayout()
         self.rel_input_csv = QLineEdit()
-        self.rel_input_csv.setPlaceholderText("Optional: path to search_results_final.csv")
+        self.rel_input_csv.setPlaceholderText("Path to search_results_final.csv")
         btn_browse_input = QPushButton("Browse…")
         row2.addWidget(QLabel("Collected CSV (CSV-2):"))
         row2.addWidget(self.rel_input_csv)
         row2.addWidget(btn_browse_input)
         ilay.addLayout(row2)
 
-        # Batch size + Max items (optional cap)
+        # Batch size + Max items
         row3 = QHBoxLayout()
         self.rel_batch_size = QLineEdit()
         self.rel_batch_size.setPlaceholderText("e.g., 15")
@@ -827,11 +932,77 @@ class AilysGUI(QWidget):
 
         layout.addWidget(ibox)
 
-        # Actions
+        # Actions (Relevance)
         self.btn_rel_run = QPushButton("Run Relevance Scoring")
         layout.addWidget(self.btn_rel_run)
 
-        # Browse handlers
+        # ------------------- Pull PDFs UI -------------------
+        pull_box = QGroupBox("Pull PDFs for Ranked/Edited CSV")
+        p_lay = QVBoxLayout(pull_box)
+
+        prow1 = QHBoxLayout()
+        self.rel_ranked_csv = QLineEdit()
+        self.rel_ranked_csv.setPlaceholderText("Path to ranked/edited CSV (output of relevance)")
+        btn_browse_ranked = QPushButton("Browse…")
+        prow1.addWidget(QLabel("Ranked CSV:"))
+        prow1.addWidget(self.rel_ranked_csv)
+        prow1.addWidget(btn_browse_ranked)
+        p_lay.addLayout(prow1)
+
+        prow2 = QHBoxLayout()
+        self.rel_pull_max = QLineEdit()
+        self.rel_pull_max.setPlaceholderText("Optional cap, e.g., 200")
+        prow2.addWidget(QLabel("Max items:"))
+        prow2.addWidget(self.rel_pull_max)
+        p_lay.addLayout(prow2)
+
+        self.btn_rel_pull = QPushButton("Pull PDFs for Ranked CSV")
+        p_lay.addWidget(self.btn_rel_pull)
+
+        layout.addWidget(pull_box)
+
+
+
+        # ------------------- Dedupe-only handlers -------------------
+        def browse_dedupe_in():
+            path, _ = QFileDialog.getOpenFileName(self, "Select CSV to de-duplicate", "", "CSV Files (*.csv)")
+            if path:
+                self.dedupe_input_csv.setText(path)
+
+        def browse_dedupe_out():
+            path = QFileDialog.getExistingDirectory(self, "Choose output folder")
+            if path:
+                self.dedupe_output_dir.setText(path)
+
+        btn_browse_dedupe_in.clicked.connect(browse_dedupe_in)
+        btn_browse_dedupe_out.clicked.connect(browse_dedupe_out)
+
+        def _run_dedupe_only():
+            csv_path = self.dedupe_input_csv.text().strip()
+            out_dir = self.dedupe_output_dir.text().strip() or None
+
+            if not csv_path:
+                self.chat_log.append("⚠️ Please select an input CSV to de-duplicate.")
+                return
+
+            self.chat_log.append("⏳ De-duplication started (NO LLM TOKENS). This can be intensive for very large files.")
+
+            def _task():
+                try:
+                    ok, msg = run_dedupe_only(csv_path, out_dir)
+                    return ok, msg
+                except Exception as e:
+                    return False, f"De-duplication failed: {e}"
+
+            self.thread = TaskRunnerThread(_task)
+            self.thread.update_status.connect(self.chat_log.append)
+            self.thread.finished.connect(self.task_finished_with_result)
+            self._attach_busy(self.thread, "Dedupe: Processing CSV…")
+            self.thread.start()
+
+        self.btn_run_dedupe_only.clicked.connect(_run_dedupe_only)
+
+        # ------------------- Browse handlers -------------------
         def browse_csv1():
             path, _ = QFileDialog.getOpenFileName(self, "Select prompt_to_keywords.csv", "", "CSV Files (*.csv)")
             if path:
@@ -842,10 +1013,16 @@ class AilysGUI(QWidget):
             if path:
                 self.rel_input_csv.setText(path)
 
+        def browse_ranked():
+            path, _ = QFileDialog.getOpenFileName(self, "Select ranked/edited CSV", "", "CSV Files (*.csv)")
+            if path:
+                self.rel_ranked_csv.setText(path)
+
         btn_browse_csv1.clicked.connect(browse_csv1)
         btn_browse_input.clicked.connect(browse_input)
+        btn_browse_ranked.clicked.connect(browse_ranked)
 
-        # Run handler
+        # ------------------- Run handlers -------------------
         def _run_rel():
             csv1 = self.rel_csv1_path.text().strip()
             if not csv1:
@@ -893,11 +1070,45 @@ class AilysGUI(QWidget):
             self.thread = TaskRunnerThread(_task)
             self.thread.update_status.connect(self.chat_log.append)
             self.thread.finished.connect(self.task_finished_with_result)
+            self._attach_busy(self.thread, "Running relevance checker")
+            self.thread.start()
+
+        def _run_pull():
+            ranked_csv = self.rel_ranked_csv.text().strip()
+            if not ranked_csv:
+                self.chat_log.append("⚠️ Please select the ranked/edited CSV.")
+                return
+
+            max_items = None
+            mtxt = self.rel_pull_max.text().strip()
+            if mtxt:
+                try:
+                    max_items = int(mtxt)
+                except ValueError:
+                    self.chat_log.append("⚠️ Max items must be an integer; ignoring.")
+                    max_items = None
+
+            self.chat_log.append("⏳ Pulling PDFs (NO LLM TOKENS). Check the Approvals pane if prompted.")
+
+            def _task():
+                try:
+                    from tasks.lit_search_pull import run as pull_run
+                except Exception as e:
+                    return False, f"Could not import lit_search_pull: {e}"
+                ok, msg = pull_run(input_csv=ranked_csv, out_root=None, max_items=max_items)
+                return ok, msg
+
+            self.thread = TaskRunnerThread(_task)
+            self.thread.update_status.connect(self.chat_log.append)
+            self.thread.finished.connect(self.task_finished_with_result)
+            self._attach_busy(self.thread, "Pulling PDFs…")
             self.thread.start()
 
         self.btn_rel_run.clicked.connect(_run_rel)
+        self.btn_rel_pull.clicked.connect(_run_pull)
 
-        self.tabs.addTab(tab, "Lit Relevance")
+        # Renamed tab:
+        self.tabs.addTab(tab, "Lit Rank/Pull")
 
     def run_ls_keywords(self):
         """Stage A – Prompt → Keywords (CSV-1)."""
@@ -924,6 +1135,7 @@ class AilysGUI(QWidget):
         self.thread = TaskRunnerThread(_task)
         self.thread.update_status.connect(self.chat_log.append)
         self.thread.finished.connect(self.task_finished_with_result)
+        self._attach_busy(self.thread, "Generating Keywords (CSV-1)…")
         self.thread.start()
 
     def run_ls_augment(self):
@@ -951,6 +1163,7 @@ class AilysGUI(QWidget):
         self.thread = TaskRunnerThread(_task)
         self.thread.update_status.connect(self.chat_log.append)
         self.thread.finished.connect(self.task_finished_with_result)
+        self._attach_busy(self.thread, "Augmenting Keywords CSV…")
         self.thread.start()
 
     def run_ls_collect(self):
@@ -970,6 +1183,7 @@ class AilysGUI(QWidget):
         self.thread = TaskRunnerThread(_task)
         self.thread.update_status.connect(self.chat_log.append)
         self.thread.finished.connect(self.task_finished_with_result)
+        self._attach_busy(self.thread, "Collecting literature (CSV-2)…")
         self.thread.start()
 
     def open_ls_output_folder(self):
@@ -1000,6 +1214,7 @@ class AilysGUI(QWidget):
         lit_tab = QWidget()
         layout = QVBoxLayout(lit_tab)
 
+        # -------- Single-file review controls --------
         self.guidance_input = QTextEdit()
         self.guidance_input.setPlaceholderText("Enter review guidance (optional)")
         layout.addWidget(self.guidance_input)
@@ -1020,10 +1235,25 @@ class AilysGUI(QWidget):
         self.run_button.clicked.connect(self.run_literature_review)
         layout.addWidget(self.run_button)
 
+        # Progress (shared for single + batch)
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 0)
         self.progress_bar.setVisible(False)
         layout.addWidget(self.progress_bar)
+
+        # -------- Batch review controls (merged here) --------
+        batch_box = QGroupBox("Batch Review")
+        b_layout = QVBoxLayout(batch_box)
+
+        self.batch_folder_button = QPushButton("Select Folder for Batch Review")
+        self.batch_folder_button.clicked.connect(self.select_batch_folder)
+        b_layout.addWidget(self.batch_folder_button)
+
+        self.batch_run_button = QPushButton("Run Batch Review")
+        self.batch_run_button.clicked.connect(self.run_batch_review)
+        b_layout.addWidget(self.batch_run_button)
+
+        layout.addWidget(batch_box)
 
         self.tabs.addTab(lit_tab, "Literature Review")
 
@@ -1185,6 +1415,7 @@ class AilysGUI(QWidget):
             self.thread = TaskRunnerThread(review_folder, self.ks_folder, None, "log_only" if downloaded else "auto")
             self.thread.update_status.connect(self.chat_log.append)
             self.thread.finished.connect(self.task_finished_with_result)
+            self._attach_busy(self.thread, "KS: Reviewing folder…")
             self.thread.start()
         except Exception as e:
             self.chat_log.append(f"❌ KS review error: {e}")
@@ -1204,6 +1435,7 @@ class AilysGUI(QWidget):
         self.thread = TaskRunnerThread(run_tl, getattr(self, 'ks_folder', None), "", 0, None, downloaded=downloaded)
         self.thread.update_status.connect(self.chat_log.append)
         self.thread.finished.connect(self.task_finished_with_result)
+        self._attach_busy(self.thread, "KS: Generating Timeline…")
         self.thread.start()
 
     def ks_generate_visuals(self):
@@ -1221,6 +1453,7 @@ class AilysGUI(QWidget):
             self.thread = TaskRunnerThread(_viz_wrapper)
             self.thread.update_status.connect(self.chat_log.append)
             self.thread.finished.connect(self.task_finished_with_result)
+            self._attach_busy(self.thread, "KS: Generating Visuals…")
             self.thread.start()
         except Exception as e:
             self.chat_log.append(f"❌ KS viz error: {e}")
@@ -1235,6 +1468,7 @@ class AilysGUI(QWidget):
             self.thread = TaskRunnerThread(export_run, None, "", 0, None, downloaded=downloaded)
             self.thread.update_status.connect(self.chat_log.append)
             self.thread.finished.connect(self.task_finished_with_result)
+            self._attach_busy(self.thread, "KS: Exporting changes…")
             self.thread.start()
         except Exception as e:
             self.chat_log.append(f"❌ KS export error: {e}")
@@ -1245,6 +1479,7 @@ class AilysGUI(QWidget):
             self.thread = TaskRunnerThread(csv_run, None, "", 0, None)
             self.thread.update_status.connect(self.chat_log.append)
             self.thread.finished.connect(self.task_finished_with_result)
+            self._attach_busy(self.thread, "KS: Exporting timeline…")
             self.thread.start()
         except Exception as e:
             self.chat_log.append(f"❌ KS CSV export error: {e}")
@@ -1255,6 +1490,7 @@ class AilysGUI(QWidget):
             self.thread = TaskRunnerThread(met_run, None, "", 0, None)
             self.thread.update_status.connect(self.chat_log.append)
             self.thread.finished.connect(self.task_finished_with_result)
+            self._attach_busy(self.thread, "KS: Computing metrics…")
             self.thread.start()
         except Exception as e:
             self.chat_log.append(f"❌ KS metrics error: {e}")
@@ -1265,6 +1501,7 @@ class AilysGUI(QWidget):
             self.thread = TaskRunnerThread(fix_ts, None, "", 0, None, downloaded=False)
             self.thread.update_status.connect(self.chat_log.append)
             self.thread.finished.connect(self.task_finished_with_result)
+            self._attach_busy(self.thread, "KS: Running maintenance…")
             self.thread.start()
         except Exception as e:
             self.chat_log.append(f"❌ KS maintenance error: {e}")
@@ -1275,6 +1512,7 @@ class AilysGUI(QWidget):
             self.thread = TaskRunnerThread(diag_run, None, "", 0, None, downloaded=False)
             self.thread.update_status.connect(self.chat_log.append)
             self.thread.finished.connect(self.task_finished_with_result)
+            self._attach_busy(self.thread, "KS: Running diagnostics…")
             self.thread.start()
         except Exception as e:
             self.chat_log.append(f"❌ KS diagnostics error: {e}")
@@ -1384,6 +1622,7 @@ class AilysGUI(QWidget):
             self.thread = TaskRunnerThread(run_litreview, self.selected_pdf, guidance, recall_depth, self.output_file_path)
             self.thread.update_status.connect(self.chat_log.append)
             self.thread.finished.connect(self.task_finished_with_result)
+            self._attach_busy(self.thread, "Lit: Conducting review…")
             self.thread.start()
         else:
             self.chat_log.append("No PDF selected.")
@@ -1423,6 +1662,7 @@ class AilysGUI(QWidget):
             self.thread = TaskRunnerThread(run_batch_litreview, self.batch_folder, self.output_file_path)
             self.thread.update_status.connect(self.chat_log.append)
             self.thread.finished.connect(self.task_finished)
+            self._attach_busy(self.thread, "Lit: Running batch review…")
             self.thread.start()
         else:
             self.chat_log.append("No batch folder selected.")

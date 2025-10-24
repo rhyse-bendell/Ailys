@@ -1201,6 +1201,54 @@ def _dedupe(rows: List[Dict[str,str]]) -> List[Dict[str,str]]:
         out.append(r)
     return out
 
+def run_dedupe_only(
+    input_csv: str,
+    out_dir: Optional[str] = None,
+    label: str = "manual"
+) -> Tuple[bool, str]:
+    """
+    Dedupe/merge an existing CSV of candidate rows (checkpoint, partial, or manually assembled).
+    - input_csv: path to a CSV with headers compatible with CSV2_HEADER (extra columns are ignored).
+    - out_dir: if provided, final CSV will be written there; else next to input.
+    - label: suffix to distinguish output (e.g., 'manual', 'checkpoint').
+
+    Produces:
+      - <out_dir>/search_results_final.<label>.csv
+    Returns (ok, message).
+    """
+    if not os.path.exists(input_csv):
+        return False, f"Input CSV not found: {input_csv}"
+
+    try:
+        rows = _read_csv_rows(input_csv)
+    except Exception as e:
+        return False, f"Could not read input CSV: {e}"
+
+    try:
+        deduped = _merge_dedupe(rows)
+    except Exception as e:
+        print(f"[dedupe_only] merge-dedupe failed, using simple dedupe: {e}")
+        try:
+            deduped = _dedupe(rows)
+        except Exception as e2:
+            return False, f"Simple dedupe failed: {e2}"
+
+    out_dir = out_dir or os.path.dirname(os.path.abspath(input_csv)) or "."
+    try:
+        os.makedirs(out_dir, exist_ok=True)
+    except Exception:
+        pass
+
+    out_final = os.path.join(out_dir, f"search_results_final.{label}.csv")
+    try:
+        if os.path.exists(out_final):
+            os.remove(out_final)
+    except Exception:
+        pass
+
+    _ensure_csv2_header(out_final)
+    _write_csv2(out_final, deduped)
+    return True, f"FINAL (dedup+merged) written: {out_final} | rows={len(deduped)}"
 
 
 def run(
@@ -1344,16 +1392,88 @@ def run(
         nonlocal last_cp_ts, since_last_cp
         now = time.time()
         if force or (since_last_cp >= _CP_ROWS) or ((now - last_cp_ts) >= _CP_SEC):
-            # Write a deduped snapshot to a checkpoint file and ensure final file exists
+            # Write a RAW (non-deduped) snapshot for progress monitoring
             try:
-                snapshot = _dedupe(collected)
                 cp_path = os.path.join(paths["csv"], "search_results_raw.checkpoint.csv")
-                _write_csv2(cp_path, snapshot)
+                _ensure_csv2_header(cp_path)
+                # append-as-we-go snapshot of current collected rows (no dedupe)
+                if collected:
+                    _write_csv2(cp_path, list(collected))
             except Exception as e:
                 print(f"[checkpoint] failed: {e}")
             last_cp_ts = now
             since_last_cp = 0
 
+    def _read_csv_rows(path: str) -> List[Dict[str, str]]:
+        rows = []
+        if not path or not os.path.exists(path):
+            return rows
+        with open(path, "r", encoding="utf-8") as f:
+            for r in csv.DictReader(f):
+                rows.append(r)
+        return rows
+
+    def _finalize_and_write(collected: List[Dict[str, str]], paths: Dict[str, str], stopped: bool) -> Tuple[
+        str, str, int, int]:
+        """
+        Dedup/merge and write FINAL output no matter how we exit.
+        Returns (out_all, out_final, raw_rows, final_rows).
+        """
+        out_all = os.path.join(paths["csv"], "search_results_raw.csv")
+        out_final = os.path.join(paths["csv"], "search_results_final.csv")
+        results_log_path = os.path.join(paths["logs"], "results_summary.log")
+
+        # Guarantee headers exist even if we never wrote any pages
+        _ensure_csv2_header(out_all)
+        _ensure_csv2_header(out_final)
+
+        # Read whatever is in RAW (true-raw) to compute final if we somehow crashed before appending
+        try:
+            raw_rows = _read_csv_rows(out_all)
+            if not raw_rows and collected:
+                # Fallback to in-memory if RAW is empty
+                raw_rows = list(collected)
+        except Exception:
+            raw_rows = list(collected)
+
+        # Dedup/merge
+        try:
+            deduped = _merge_dedupe(raw_rows)
+        except Exception as e:
+            print(f"[finalize] merge-dedupe failed, falling back to simple dedupe: {e}")
+            try:
+                deduped = _dedupe(raw_rows)
+            except Exception as e2:
+                print(f"[finalize] simple dedupe also failed, writing raw collected: {e2}")
+                deduped = list(raw_rows)
+
+        # Clean final write (recreate file)
+        try:
+            if os.path.exists(out_final):
+                os.remove(out_final)
+        except Exception:
+            pass
+        _ensure_csv2_header(out_final)
+        _write_csv2(out_final, deduped)
+
+        # Mark interruption if applicable
+        if stopped:
+            try:
+                with open(os.path.join(paths["csv"], "INTERRUPTED"), "w", encoding="utf-8") as f:
+                    f.write("stop=true\n")
+            except Exception:
+                pass
+
+        # Log a compact summary line
+        try:
+            _write_log_line(
+                results_log_path,
+                f"[FINAL]{' STOPPED' if stopped else ''} raw={len(raw_rows)} final={len(deduped)} | out_all={out_all} | out_final={out_final}"
+            )
+        except Exception:
+            pass
+
+        return out_all, out_final, len(raw_rows), len(deduped)
 
     # Helpful hints if missing identifiers (some APIs throttle or behave oddly)
     if not (os.getenv("OPENALEX_EMAIL", "").strip()):
@@ -1411,7 +1531,7 @@ def run(
 
         if _should_stop(stop_flag_path):
             _dbg("Stop requested before collection started; exiting early.")
-            return True
+            return "stopped"
 
         # helper to write queries to a log file so we can inspect real requests
         def _log_query(engine: str, q: str):
@@ -1472,7 +1592,7 @@ def run(
                     print(f"[collect] {engine}: +{len(new_rows)} (planned queries).")
                     if _should_stop(stop_flag_path):
                         _dbg(f"Stop requested after {engine} block; exiting early.")
-                        return True
+                        return "stopped"
                 except Exception as e:
                     engine_errors["OpenAlex"] += 1
                     print(f"[collect][OpenAlex] error: {e}")
@@ -1520,7 +1640,7 @@ def run(
                     print(f"[collect] {engine}: +{len(new_rows)} (planned queries).")
                     if _should_stop(stop_flag_path):
                         _dbg(f"Stop requested after {engine} block; exiting early.")
-                        return True
+                        return "stopped"
                 except Exception as e:
                     engine_errors["Crossref"] += 1
                     print(f"[collect][Crossref] error: {e}")
@@ -1569,7 +1689,7 @@ def run(
                     print(f"[collect] {engine}: +{len(new_rows)} (planned queries).")
                     if _should_stop(stop_flag_path):
                         _dbg(f"Stop requested after {engine} block; exiting early.")
-                        return True
+                        return "stopped"
                 except Exception as e:
                     engine_errors["arXiv"] += 1
                     print(f"[collect][arXiv] error: {e}")
@@ -1618,7 +1738,7 @@ def run(
                     print(f"[collect] {engine}: +{len(new_rows)} (planned queries).")
                     if _should_stop(stop_flag_path):
                         _dbg(f"Stop requested after {engine} block; exiting early.")
-                        return True
+                        return "stopped"
                 except Exception as e:
                     engine_errors["PubMed"] += 1
                     print(f"[collect][PubMed] error: {e}")
@@ -1666,118 +1786,182 @@ def run(
                     print(f"[collect] {engine}: +{len(new_rows)} (planned queries).")
                     if _should_stop(stop_flag_path):
                         _dbg(f"Stop requested after {engine} block; exiting early.")
-                        return True
+                        return "stopped"
                 except Exception as e:
                     engine_errors["SemanticScholar"] += 1
                     print(f"[collect][SemanticScholar] error: {e}")
 
-        return True
+        return "completed"
 
+    # ----------------------- Stop-safe finalize (always) -----------------------
+    def _finalize_and_write() -> Tuple[bool, str]:
+        """
+        End-of-run finalize for the *collection* task:
+          - DO NOT de-duplicate here.
+          - Ensure RAW/partial/enriched CSVs exist with headers.
+          - Create an empty-header 'search_results_final.csv' placeholder only (no data).
+          - Write INTERRUPTED markers if STOP was requested.
+          - Log a clear RAW-only summary with guidance to run de-dup later.
+        """
+        interrupted = _should_stop(os.getenv("LIT_STOP_FLAG_PATH", ""))
 
-    # Make the approval description explicit: no LLM spend; show scale
-    req_count = len(qs) * len(engines)
-    desc = (f"Literature Collection (CSV-2) — NO LLM TOKENS | "
-            f"engines={','.join(engines)} | queries={len(qs)} | requests≈{req_count}")
+        # Force a last checkpoint (RAW snapshot)
+        try:
+            _maybe_checkpoint(True)
+        except Exception:
+            pass
 
-    # Approve once for CSV-2; then run all downstream non-token API calls without
-    # further approvals by temporarily switching the queue to 'auto' for _collect.
-    ok = approvals.request_approval(
-        description=desc,
-        call_fn=lambda ov=None: _with_temp_approval_mode("auto", _collect),
-        timeout=None
-    )
-    if not ok:
-        return False, "Approval denied or failed."
+        # Ensure output files exist (headers only if empty)
+        try:
+            if paths.get('csv'):
+                os.makedirs(paths['csv'], exist_ok=True)
+                raw_path = os.path.join(paths['csv'], 'search_results_raw.csv')
+                partial_path = os.path.join(paths['csv'], 'search_results_partial.csv')
+                enriched_path = os.path.join(paths['csv'], 'search_results_enriched_partial.csv')
+                final_placeholder = os.path.join(paths['csv'], 'search_results_final.csv')
 
-    # ---- Enrichment phase (no LLM) --------------------------------------------
-    # Only enrich items that are missing/short abstracts.
+                _ensure_csv2_header(raw_path)
+                _ensure_csv2_header(partial_path)
+                _ensure_csv2_header(enriched_path)
+                # Placeholder for downstream compatibility; *not* populated here
+                _ensure_csv2_header(final_placeholder)
+        except Exception as e:
+            print(f"[guard] could not ensure output files: {e}")
+
+        # INTERRUPTED marker (lets the GUI show a yellow “completed (stopped)” state)
+        try:
+            if interrupted and paths.get("logs"):
+                with open(os.path.join(paths["logs"], "INTERRUPTED"), "w", encoding="utf-8") as f:
+                    f.write("STOP was requested; finalize() ran. RAW collection complete; no de-dup performed.\n")
+        except Exception:
+            pass
+
+        # Summaries for console/log
+        try:
+            total = sum(engine_counts.values())
+            print("[summary] Engine totals:", dict(engine_counts), "grand_total:", total)
+            try:
+                attempts = dict(engine_attempts)
+                success = dict(engine_success)
+                failures = {k: attempts.get(k, 0) - success.get(k, 0) for k in attempts.keys()}
+                print("[summary] Engine attempts:", attempts)
+                print("[summary] Engine success:", success)
+                print("[summary] Engine failures:", failures)
+            except Exception:
+                pass
+            if any(engine_errors.values()):
+                print("[summary] Engine errors:", dict(engine_errors))
+        except Exception:
+            pass
+
+        # Compose final message (RAW-only)
+        try:
+            raw_rows = len(collected)
+        except Exception:
+            raw_rows = -1
+
+        out_all = os.path.join(paths["csv"], "search_results_raw.csv")
+        out_final_placeholder = os.path.join(paths["csv"], "search_results_final.csv")
+        results_log_path = os.path.join(paths["logs"], "results_summary.log")
+
+        msg = (
+            f"{'⛔ ' if interrupted else ''}RAW (all rows) written/appended: {out_all} | rows≈{raw_rows}\n"
+            f"   De-dup is now a separate step. Use the GUI 'De-duplicate' button or call:\n"
+            f"   run_dedupe_only(input_csv_path='{out_all}', output_dir='{paths['csv']}')\n"
+            f"   (A placeholder exists at: {out_final_placeholder}, but it is intentionally empty until de-dup runs.)"
+        )
+        print(msg)
+        try:
+            _write_log_line(
+                results_log_path,
+                f"[FINAL{' [INTERRUPTED]' if interrupted else ''}] raw≈{raw_rows} | out_all={out_all} | final_placeholder={out_final_placeholder} (no de-dup)"
+            )
+        except Exception:
+            pass
+
+        return True, msg
+
+    # ----------------------- Orchestration: try/finally ------------------------
+    ok_collect = False
     try:
-        _enrich_missing_abstracts(collected)
+        # Make the approval description explicit: no LLM spend; show scale
+        req_count = len(qs) * len(engines)
+        desc = (f"Literature Collection (CSV-2) — NO LLM TOKENS | "
+                f"engines={','.join(engines)} | queries={len(qs)} | requests≈{req_count}")
 
+        # Single approval; temporarily switch approvals to 'auto' so
+        # downstream network-only calls don’t enqueue new prompts.
+        ok = approvals.request_approval(
+            description=desc,
+            call_fn=lambda ov=None: _with_temp_approval_mode("auto", _collect),
+            timeout=None
+        )
+        if not ok:
+            return False, "Approval denied or failed."
+
+        ok_collect = True
+
+        # Enrichment (non-LLM): fill short/missing abstracts
+        try:
+            _enrich_missing_abstracts(collected)
+        except Exception as e:
+            print(f"[enrich] non-fatal error: {e}")
+
+    finally:
+        # No matter what (STOP, error, normal finish), produce FINAL.
+        _ok, _msg = _finalize_and_write()
+
+    return (ok_collect and _ok), _msg
+
+def run_dedupe_only(input_csv_path: str, output_dir: Optional[str] = None) -> Tuple[bool, str]:
+    """
+    Utility entrypoint to dedupe/merge an **existing** CSV (raw/checkpoint/combined),
+    writing a fresh 'search_results_final.csv' in output_dir (or alongside input).
+
+    - input_csv_path: CSV with columns compatible with CSV2_HEADER.
+    - output_dir: optional folder to write final CSV; defaults to dirname(input_csv_path).
+    """
+    if not os.path.exists(input_csv_path):
+        return False, f"Input CSV not found: {input_csv_path}"
+
+    try:
+        rows: List[Dict[str, str]] = []
+        with open(input_csv_path, "r", encoding="utf-8") as f:
+            r = csv.DictReader(f)
+            for row in r:
+                rows.append(dict(row))
     except Exception as e:
-        print(f"[enrich] non-fatal error: {e}")
+        return False, f"Could not read CSV: {e}"
 
-    # Always produce a final CSV (even if empty), and force one last checkpoint
+    # Dedupe/merge with fallback
     try:
-        _maybe_checkpoint(True)
+        final_rows = _merge_dedupe(rows)
+    except Exception as e:
+        print(f"[dedupe_only] merge-dedupe failed, falling back to simple dedupe: {e}")
+        try:
+            final_rows = _dedupe(rows)
+        except Exception as e2:
+            print(f"[dedupe_only] simple dedupe also failed: {e2}")
+            final_rows = list(rows)
+
+    out_dir = output_dir or os.path.dirname(os.path.abspath(input_csv_path)) or "."
+    try:
+        os.makedirs(out_dir, exist_ok=True)
+    except Exception:
+        pass
+    out_final = os.path.join(out_dir, "search_results_final.csv")
+
+    try:
+        if os.path.exists(out_final):
+            os.remove(out_final)
     except Exception:
         pass
 
-    # ---- Finalize outputs -----------------------------------------------------
-    try:
-        deduped = _merge_dedupe(collected)
-    except Exception as e:
-        print(f"[finalize] merge-dedupe failed, falling back to simple dedupe: {e}")
-        try:
-            deduped = _dedupe(collected)
-        except Exception as e2:
-            print(f"[finalize] simple dedupe also failed, writing raw collected: {e2}")
-            deduped = list(collected)
-
-    # Write FINAL (dedup/merged) cleanly
     try:
         _ensure_csv2_header(out_final)
-        try:
-            if os.path.exists(out_final):
-                os.remove(out_final)
-        except Exception:
-            pass
-        _write_csv2(out_final, deduped)
+        _write_csv2(out_final, final_rows)
     except Exception as e:
-        print(f"[finalize] final write failed: {e}")
+        return False, f"Failed to write final CSV: {e}"
 
-    # Coverage summary
-    try:
-        total = sum(engine_counts.values())
-        print("[summary] Engine totals:", dict(engine_counts), "grand_total:", total)
+    return True, f"FINAL (dedup+merged) written: {out_final} | rows={len(final_rows)}"
 
-        try:
-            attempts = dict(engine_attempts)
-            success = dict(engine_success)
-            failures = {k: attempts.get(k, 0) - success.get(k, 0) for k in attempts.keys()}
-            print("[summary] Engine attempts:", attempts)
-            print("[summary] Engine success:", success)
-            print("[summary] Engine failures:", failures)
-        except Exception:
-            pass
-
-
-        if any(engine_errors.values()):
-            print("[summary] Engine errors:", dict(engine_errors))
-    except Exception:
-        pass
-
-    # Last-chance safety: guarantee folder + at least headers exist if we crashed before writing
-    try:
-        if paths.get('csv'):
-            os.makedirs(paths['csv'], exist_ok=True)
-            _ensure_csv2_header(os.path.join(paths['csv'], 'search_results_partial.csv'))
-            _ensure_csv2_header(os.path.join(paths['csv'], 'search_results_enriched_partial.csv'))
-            _ensure_csv2_header(os.path.join(paths['csv'], 'search_results_raw.csv'))  # true RAW
-            _ensure_csv2_header(os.path.join(paths['csv'], 'search_results_final.csv'))  # FINAL dedup/merged
-    except Exception as e:
-        print(f"[guard] could not ensure output files: {e}")
-
-
-    # ---- Final status ------------------------------------------------------------
-    try:
-        raw_rows = len(collected)
-    except Exception:
-        raw_rows = -1
-    try:
-        final_rows = len(deduped)
-    except Exception:
-        final_rows = -1
-
-    msg = (
-        f"RAW (all rows) written: {out_all} | rows={raw_rows}\n"
-        f"FINAL (dedup+merged) written: {out_final} | rows={final_rows}"
-    )
-    print(msg)
-    # also drop a single-line summary into the results log
-    try:
-        _write_log_line(results_log_path, f"[FINAL] raw={raw_rows} final={final_rows} | out_all={out_all} | out_final={out_final}")
-    except Exception:
-        pass
-
-    return True, msg
