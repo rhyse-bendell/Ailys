@@ -1201,61 +1201,62 @@ def _dedupe(rows: List[Dict[str,str]]) -> List[Dict[str,str]]:
         out.append(r)
     return out
 
-def run_dedupe_only(
-    input_csv: str,
-    out_dir: Optional[str] = None,
-    label: str = "manual"
-) -> Tuple[bool, str]:
-    """
-    Dedupe/merge an existing CSV of candidate rows (checkpoint, partial, or manually assembled).
-    - input_csv: path to a CSV with headers compatible with CSV2_HEADER (extra columns are ignored).
-    - out_dir: if provided, final CSV will be written there; else next to input.
-    - label: suffix to distinguish output (e.g., 'manual', 'checkpoint').
-
-    Produces:
-      - <out_dir>/search_results_final.<label>.csv
-    Returns (ok, message).
-    """
-    if not os.path.exists(input_csv):
-        return False, f"Input CSV not found: {input_csv}"
-
-    try:
-        rows = _read_csv_rows(input_csv)
-    except Exception as e:
-        return False, f"Could not read input CSV: {e}"
-
-    try:
-        deduped = _merge_dedupe(rows)
-    except Exception as e:
-        print(f"[dedupe_only] merge-dedupe failed, using simple dedupe: {e}")
-        try:
-            deduped = _dedupe(rows)
-        except Exception as e2:
-            return False, f"Simple dedupe failed: {e2}"
-
-    out_dir = out_dir or os.path.dirname(os.path.abspath(input_csv)) or "."
-    try:
-        os.makedirs(out_dir, exist_ok=True)
-    except Exception:
-        pass
-
-    out_final = os.path.join(out_dir, f"search_results_final.{label}.csv")
-    try:
-        if os.path.exists(out_final):
-            os.remove(out_final)
-    except Exception:
-        pass
-
-    _ensure_csv2_header(out_final)
-    _write_csv2(out_final, deduped)
-    return True, f"FINAL (dedup+merged) written: {out_final} | rows={len(deduped)}"
+# def run_dedupe_only(
+#     input_csv: str,
+#     out_dir: Optional[str] = None,
+#     label: str = "manual"
+# ) -> Tuple[bool, str]:
+#     """
+#     Dedupe/merge an existing CSV of candidate rows (checkpoint, partial, or manually assembled).
+#     - input_csv: path to a CSV with headers compatible with CSV2_HEADER (extra columns are ignored).
+#     - out_dir: if provided, final CSV will be written there; else next to input.
+#     - label: suffix to distinguish output (e.g., 'manual', 'checkpoint').
+#
+#     Produces:
+#       - <out_dir>/search_results_final.<label>.csv
+#     Returns (ok, message).
+#     """
+#     if not os.path.exists(input_csv):
+#         return False, f"Input CSV not found: {input_csv}"
+#
+#     try:
+#         rows = _read_csv_rows(input_csv)
+#     except Exception as e:
+#         return False, f"Could not read input CSV: {e}"
+#
+#     try:
+#         deduped = _merge_dedupe(rows)
+#     except Exception as e:
+#         print(f"[dedupe_only] merge-dedupe failed, using simple dedupe: {e}")
+#         try:
+#             deduped = _dedupe(rows)
+#         except Exception as e2:
+#             return False, f"Simple dedupe failed: {e2}"
+#
+#     out_dir = out_dir or os.path.dirname(os.path.abspath(input_csv)) or "."
+#     try:
+#         os.makedirs(out_dir, exist_ok=True)
+#     except Exception:
+#         pass
+#
+#     out_final = os.path.join(out_dir, f"search_results_final.{label}.csv")
+#     try:
+#         if os.path.exists(out_final):
+#             os.remove(out_final)
+#     except Exception:
+#         pass
+#
+#     _ensure_csv2_header(out_final)
+#     _write_csv2(out_final, deduped)
+#     return True, f"FINAL (dedup+merged) written: {out_final} | rows={len(deduped)}"
 
 
 def run(
     csv1_path: str,
     researcher: Optional[str] = None,
     per_source: int = 500,
-    include: Optional[List[str]] = None
+    include: Optional[List[str]] = None,
+    save_prefix: Optional[str] = None,
 ):
     """
     csv1_path: path to prompt_to_keywords.csv (from Stage A)
@@ -1302,13 +1303,22 @@ def run(
     paths.setdefault("raw", os.path.join(default_root, "raw"))
     paths.setdefault("logs", os.path.join(default_root, "logs"))
 
+    # ---- optional save prefix: nest each output root under <prefix>/ ----
+    safe_prefix = None
+    if save_prefix:
+        safe_prefix = re.sub(r"[^\w\-.]+", "_", save_prefix.strip())
+        for key in ("csv", "raw", "logs"):
+            try:
+                paths[key] = os.path.join(paths[key], safe_prefix)
+            except Exception as e:
+                print(f"[io] could not compose prefixed dir for {key}: {e}")
+
     # ensure dirs
     for key in ("csv", "raw", "logs"):
         try:
             os.makedirs(paths[key], exist_ok=True)
         except Exception as e:
             print(f"[io] could not create output dir for {key}: {e}")
-
 
     # Create a fresh, unique subfolder per invocation to avoid overwrites.
     # Example: runs/<run_id>/attempt_2025-10-21_15-03-42
@@ -1323,6 +1333,11 @@ def run(
         except Exception as e:
             print(f"[io] could not create unique attempt dir for {key}: {e}")
     _dbg(f"Writing outputs to unique attempt folder: csv={paths['csv']} raw={paths['raw']} logs={paths['logs']}")
+
+    # Helper: apply prefix to filenames as well as folders
+    def _pf(name: str) -> str:
+        return f"{safe_prefix}_{name}" if safe_prefix else name
+
 
     # Summarize a few relevant env knobs we rely on (debug-only)
     try:
@@ -1342,8 +1357,8 @@ def run(
     except Exception:
         pass
 
-    queries_log_path = os.path.join(paths["logs"], "queries_emitted.log")
-    results_log_path = os.path.join(paths["logs"], "results_summary.log")
+    queries_log_path = os.path.join(paths["logs"], _pf("queries_emitted.log"))
+    results_log_path = os.path.join(paths["logs"], _pf("results_summary.log"))
 
     stop_flag_path = os.path.join(paths["logs"], "STOP")
     # expose to GUI so a Stop button can touch the file
@@ -1351,19 +1366,19 @@ def run(
     except Exception: pass
 
     # True RAW (legacy name kept, but now truly "all rows"): every collected row, no dedupe/merge
-    out_all = os.path.join(paths["csv"], "search_results_raw.csv")
+    out_all = os.path.join(paths["csv"], _pf("search_results_raw.csv"))
     _ensure_csv2_header(out_all)
 
-    # Final, de-duplicated + merged file (this is what downstream stages should consume)
-    out_final = os.path.join(paths["csv"], "search_results_final.csv")  # new canonical final
+    # Final, de-duplicated + merged file (placeholder during collect; de-dup step writes real one)
+    out_final = os.path.join(paths["csv"], _pf("search_results_final.csv"))
     # (header ensured later right before writing)
 
     # Streaming (append-as-we-go) file for progress monitoring (non-deduped, handy for tails)
-    out_partial = os.path.join(paths["csv"], "search_results_partial.csv")
+    out_partial = os.path.join(paths["csv"], _pf("search_results_partial.csv"))
     _ensure_csv2_header(out_partial)
 
     # Streaming enrichment (as abstracts get filled)
-    out_enriched = os.path.join(paths["csv"], "search_results_enriched_partial.csv")
+    out_enriched = os.path.join(paths["csv"], _pf("search_results_enriched_partial.csv"))
     _ensure_csv2_header(out_enriched)
 
     engines = include or ["OpenAlex","Crossref","arXiv","PubMed","SemanticScholar"]
@@ -1394,7 +1409,7 @@ def run(
         if force or (since_last_cp >= _CP_ROWS) or ((now - last_cp_ts) >= _CP_SEC):
             # Write a RAW (non-deduped) snapshot for progress monitoring
             try:
-                cp_path = os.path.join(paths["csv"], "search_results_raw.checkpoint.csv")
+                cp_path = os.path.join(paths["csv"], _pf("search_results_raw.checkpoint.csv"))
                 _ensure_csv2_header(cp_path)
                 # append-as-we-go snapshot of current collected rows (no dedupe)
                 if collected:
@@ -1404,76 +1419,6 @@ def run(
             last_cp_ts = now
             since_last_cp = 0
 
-    def _read_csv_rows(path: str) -> List[Dict[str, str]]:
-        rows = []
-        if not path or not os.path.exists(path):
-            return rows
-        with open(path, "r", encoding="utf-8") as f:
-            for r in csv.DictReader(f):
-                rows.append(r)
-        return rows
-
-    def _finalize_and_write(collected: List[Dict[str, str]], paths: Dict[str, str], stopped: bool) -> Tuple[
-        str, str, int, int]:
-        """
-        Dedup/merge and write FINAL output no matter how we exit.
-        Returns (out_all, out_final, raw_rows, final_rows).
-        """
-        out_all = os.path.join(paths["csv"], "search_results_raw.csv")
-        out_final = os.path.join(paths["csv"], "search_results_final.csv")
-        results_log_path = os.path.join(paths["logs"], "results_summary.log")
-
-        # Guarantee headers exist even if we never wrote any pages
-        _ensure_csv2_header(out_all)
-        _ensure_csv2_header(out_final)
-
-        # Read whatever is in RAW (true-raw) to compute final if we somehow crashed before appending
-        try:
-            raw_rows = _read_csv_rows(out_all)
-            if not raw_rows and collected:
-                # Fallback to in-memory if RAW is empty
-                raw_rows = list(collected)
-        except Exception:
-            raw_rows = list(collected)
-
-        # Dedup/merge
-        try:
-            deduped = _merge_dedupe(raw_rows)
-        except Exception as e:
-            print(f"[finalize] merge-dedupe failed, falling back to simple dedupe: {e}")
-            try:
-                deduped = _dedupe(raw_rows)
-            except Exception as e2:
-                print(f"[finalize] simple dedupe also failed, writing raw collected: {e2}")
-                deduped = list(raw_rows)
-
-        # Clean final write (recreate file)
-        try:
-            if os.path.exists(out_final):
-                os.remove(out_final)
-        except Exception:
-            pass
-        _ensure_csv2_header(out_final)
-        _write_csv2(out_final, deduped)
-
-        # Mark interruption if applicable
-        if stopped:
-            try:
-                with open(os.path.join(paths["csv"], "INTERRUPTED"), "w", encoding="utf-8") as f:
-                    f.write("stop=true\n")
-            except Exception:
-                pass
-
-        # Log a compact summary line
-        try:
-            _write_log_line(
-                results_log_path,
-                f"[FINAL]{' STOPPED' if stopped else ''} raw={len(raw_rows)} final={len(deduped)} | out_all={out_all} | out_final={out_final}"
-            )
-        except Exception:
-            pass
-
-        return out_all, out_final, len(raw_rows), len(deduped)
 
     # Helpful hints if missing identifiers (some APIs throttle or behave oddly)
     if not (os.getenv("OPENALEX_EMAIL", "").strip()):
@@ -1815,10 +1760,10 @@ def run(
         try:
             if paths.get('csv'):
                 os.makedirs(paths['csv'], exist_ok=True)
-                raw_path = os.path.join(paths['csv'], 'search_results_raw.csv')
-                partial_path = os.path.join(paths['csv'], 'search_results_partial.csv')
-                enriched_path = os.path.join(paths['csv'], 'search_results_enriched_partial.csv')
-                final_placeholder = os.path.join(paths['csv'], 'search_results_final.csv')
+                raw_path = os.path.join(paths["csv"], _pf('search_results_raw.csv'))
+                partial_path = os.path.join(paths["csv"], _pf('search_results_partial.csv'))
+                enriched_path = os.path.join(paths["csv"], _pf('search_results_enriched_partial.csv'))
+                final_placeholder = os.path.join(paths["csv"], _pf('search_results_final.csv'))
 
                 _ensure_csv2_header(raw_path)
                 _ensure_csv2_header(partial_path)
@@ -1860,9 +1805,10 @@ def run(
         except Exception:
             raw_rows = -1
 
-        out_all = os.path.join(paths["csv"], "search_results_raw.csv")
-        out_final_placeholder = os.path.join(paths["csv"], "search_results_final.csv")
-        results_log_path = os.path.join(paths["logs"], "results_summary.log")
+        out_all = os.path.join(paths["csv"], _pf("search_results_raw.csv"))
+        out_final_placeholder = os.path.join(paths["csv"], _pf("search_results_final.csv"))
+
+        results_log_path = os.path.join(paths["logs"], _pf("results_summary.log"))
 
         msg = (
             f"{'⛔ ' if interrupted else ''}RAW (all rows) written/appended: {out_all} | rows≈{raw_rows}\n"

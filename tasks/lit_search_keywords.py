@@ -136,12 +136,15 @@ def run(
     researcher: str = " ",
     run_id: Optional[str] = None,
     clarifications_csv_path: Optional[str] = None,
+    save_prefix: Optional[str] = None,   # <— NEW: optional save prefix for folder + filename
 ):
     """
     Stage A – Prompt → Keywords (CSV-1).
     - file_path: unused (kept for TaskManager compatibility)
     - guidance: the research prompt
     - clarifications_csv_path: if provided, read last row to pick up 'clarifications'
+    - save_prefix: when provided, CSV is saved under a <paths['csv']>/<prefix>/ folder
+                   and the filename is <prefix>_prompt_to_keywords.csv
     """
     prompt = (guidance or "").strip()
     if not prompt and not clarifications_csv_path:
@@ -163,7 +166,7 @@ def run(
         messages=msgs,
         description="Literature Search: generate keywords and boolean queries",
         temperature=None,  # let artificial_cognition enforce gpt-5 compatibility
-        max_tokens=2000,  # safer headroom for JSON lists
+        max_tokens=2000,   # safer headroom for JSON lists
         timeout=None,
     )
 
@@ -173,12 +176,26 @@ def run(
 
     parsed = _parse_json_block(llm_reply)
 
-    # Write CSV-1
+    # Write CSV-1 (support save_prefix for paths & naming)
     rid = run_id or make_run_id()
-    paths = run_dirs(rid)
-    out_csv = os.path.join(paths["csv"], "prompt_to_keywords.csv")
-    now = datetime.datetime.utcnow().isoformat()
+    paths = run_dirs(rid)  # typically yields {'csv': ..., 'raw': ..., 'logs': ...}
+    base_csv_dir = paths["csv"]
 
+    # Default location & name
+    out_dir = base_csv_dir
+    out_name = "prompt_to_keywords.csv"
+
+    # If a prefix is provided, nest inside a prefix folder and prefix the filename
+    if save_prefix:
+        # sanitize a little: keep simple filesystem-friendly name
+        safe_prefix = re.sub(r"[^\w\-\.]+", "_", save_prefix.strip())
+        out_dir = os.path.join(base_csv_dir, safe_prefix)
+        out_name = f"{safe_prefix}_prompt_to_keywords.csv"
+
+    os.makedirs(out_dir, exist_ok=True)
+    out_csv = os.path.join(out_dir, out_name)
+
+    now = datetime.datetime.utcnow().isoformat()
     write_csv_row(out_csv, {
         "run_id": rid,
         "timestamp_utc": now,
@@ -191,7 +208,10 @@ def run(
         "notes": ""
     }, CSV_HEADER)
 
-    return True, f"CSV written: {out_csv}"
+    # Helpful success message
+    suffix = f" (prefixed under '{save_prefix}')" if save_prefix else ""
+    return True, f"CSV written: {out_csv}{suffix}"
+
 
 # --- Normalization helpers for CSV-1 schema ---------------------------------
 

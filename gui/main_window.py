@@ -738,7 +738,7 @@ class AilysGUI(QWidget):
         researcherBox = QGroupBox("Researcher")
         rLay = QHBoxLayout(researcherBox)
         self.ls_researcher = QLineEdit()
-        self.ls_researcher.setPlaceholderText("Enter your display name (e.g., Jess)")
+        self.ls_researcher.setPlaceholderText("Enter your display name (e.g., Ailys)")
         rLay.addWidget(QLabel("Name:"))
         rLay.addWidget(self.ls_researcher)
         layout.addWidget(researcherBox)
@@ -752,10 +752,23 @@ class AilysGUI(QWidget):
             "Example: I need to find literature on neurodiversity in teams, "
             "especially where AI supports collaboration or task performance."
         )
+
         self.btn_ls_keywords = QPushButton("Generate Keywords (CSV-1)")
         gLay.addWidget(QLabel("Prompt:"))
         gLay.addWidget(self.ls_prompt)
+
+        # NEW: Save prefix for CSV-1 outputs
+        kpRow = QHBoxLayout()
+        self.ls_keywords_prefix = QLineEdit()
+        self.ls_keywords_prefix.setPlaceholderText("Optional save prefix for CSV-1 (e.g., collabLearning)")
+        kpRow.addWidget(QLabel("Save prefix:"))
+        kpRow.addWidget(self.ls_keywords_prefix)
+        gLay.addLayout(kpRow)
+
         gLay.addWidget(self.btn_ls_keywords)
+
+
+
         layout.addWidget(genBox)
 
         # 3) Augment an existing keywords CSV with a new clarification ---------------
@@ -797,19 +810,17 @@ class AilysGUI(QWidget):
         cRow.addWidget(btn_browse_csv1)
         cLay.addLayout(cRow)
 
+        # NEW: Save prefix for CSV-2 collection outputs
+        cpRow = QHBoxLayout()
+        self.ls_collect_prefix = QLineEdit()
+        self.ls_collect_prefix.setPlaceholderText("Optional save prefix for collection (e.g., collabLearning)")
+        cpRow.addWidget(QLabel("Save prefix:"))
+        cpRow.addWidget(self.ls_collect_prefix)
+        cLay.addLayout(cpRow)
+
         self.btn_ls_collect = QPushButton("Request Approval & Start Collection (NO LLM TOKENS)")
         cLay.addWidget(self.btn_ls_collect)
         layout.addWidget(colBox)
-
-        # Optional future steps
-#        self.btn_ls_filter = QPushButton("Filter to Consider (CSV-3)")
-#        self.btn_ls_filter.setEnabled(False)
-#        self.btn_ls_open = QPushButton("Open Output Folder")
-#        self.btn_ls_open.setEnabled(False)
-#        layout.addWidget(self.btn_ls_filter)
-#        layout.addWidget(self.btn_ls_open)
-#        self.btn_ls_open.clicked.connect(self.open_ls_output_folder)
-
 
         # Browse handlers
         def browse_aug_csv():
@@ -1237,6 +1248,7 @@ class AilysGUI(QWidget):
 
         prompt = self.ls_prompt.toPlainText().strip()
         researcher = self.ls_researcher.text().strip() or "Researcher"
+        save_prefix = (self.ls_keywords_prefix.text().strip() or None)
 
         if not prompt:
             self.chat_log.append("⚠️ Please enter a search prompt for CSV-1 generation.")
@@ -1244,12 +1256,25 @@ class AilysGUI(QWidget):
 
         def _task():
             from tasks.lit_search_keywords import run as run_keywords
-            ok, msg = run_keywords(
-                None,
+            kwargs = dict(
+                root=None,
                 guidance=prompt,
                 clarifications_csv_path=None,  # no CSV in this stage after UI refactor
                 researcher=researcher
             )
+            if save_prefix:
+                kwargs["save_prefix"] = save_prefix
+
+            try:
+                ok, msg = run_keywords(**kwargs)
+            except TypeError:
+                # Older task without save_prefix support — retry without it
+                if "save_prefix" in kwargs:
+                    kwargs.pop("save_prefix", None)
+                    ok, msg = run_keywords(**kwargs)
+                    msg = msg + "\nℹ️ Note: save_prefix not supported by Keywords task; ignored."
+                else:
+                    raise
             return ok, msg
 
         self.thread = TaskRunnerThread(_task)
@@ -1290,6 +1315,7 @@ class AilysGUI(QWidget):
         """Stage B – Keywords → Candidate Records (CSV-2)."""
         csv1 = self.ls_csv1_path.text().strip()
         researcher = self.ls_researcher.text().strip() or None
+        save_prefix = (self.ls_collect_prefix.text().strip() or None)
 
         if not csv1:
             self.chat_log.append("⚠️ Please select the CSV-1 file (prompt_to_keywords.csv).")
@@ -1297,7 +1323,19 @@ class AilysGUI(QWidget):
 
         def _task():
             from tasks.lit_search_collect import run as run_collect
-            ok, msg = run_collect(csv1_path=csv1, researcher=researcher, per_source=20)
+            kwargs = dict(csv1_path=csv1, researcher=researcher, per_source=20)
+            if save_prefix:
+                kwargs["save_prefix"] = save_prefix
+            try:
+                ok, msg = run_collect(**kwargs)
+            except TypeError:
+                # Older task without save_prefix support — retry without it
+                if "save_prefix" in kwargs:
+                    kwargs.pop("save_prefix", None)
+                    ok, msg = run_collect(**kwargs)
+                    msg = msg + "\nℹ️ Note: save_prefix not supported by Collection task; ignored."
+                else:
+                    raise
             return ok, msg
 
         self.thread = TaskRunnerThread(_task)
