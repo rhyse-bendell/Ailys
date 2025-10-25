@@ -13,7 +13,8 @@ from PySide6.QtCore import Qt, QThread, Signal, QTimer
 
 
 from tasks.literature_review import run as run_litreview
-from tasks.lit_search_collect import run_dedupe_only
+from tasks.lit_dedupe import run as run_dedupe_only
+
 
 from core.batch import run_batch_litreview
 from memory_loader import load_reviews_to_memory
@@ -207,7 +208,9 @@ class AilysGUI(QWidget):
         self.create_api_config_tab()
 
         self.create_lit_search_tab()
+        self.create_lit_cleanup_tab()    # De-dup, Enrich, Triage
         self.create_lit_relevance_tab()  # renamed inside to "Lit Rank/Pull"
+
 
         self.create_literature_tab()  # now includes Batch controls
         # self.create_batch_tab()         # merged into Literature Review tab
@@ -844,21 +847,19 @@ class AilysGUI(QWidget):
         # Add Tab
         self.tabs.addTab(tab, "Lit Search")
 
-    # =========================================================================== #
-    # -------------------------- Button Handlers -------------------------------- #
-    # =========================================================================== #
-    # -------------------------- Lit Relevance Tab ------------------------------ #
-    def create_lit_relevance_tab(self):
+    def create_lit_cleanup_tab(self):
         """
-        Stage C – Relevance scoring (CSV-2 → rank-ordered CSV for PDF pulls).
-        Also: De-dup-only helper and Zero-LLM Triage splitter.
+        Lit Candidate Cleanup:
+          • De-duplicate (NO LLM)
+          • Enrich Abstracts & Repair text (NO LLM)
+          • Triage (Zero-LLM)
         """
         from PySide6.QtWidgets import (
             QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QTextEdit,
             QPushButton, QFileDialog, QGroupBox
         )
-        import shutil
         import re
+        import os
 
         tab = QWidget()
         layout = QVBoxLayout(tab)
@@ -866,72 +867,240 @@ class AilysGUI(QWidget):
         layout.setSpacing(10)
 
         # ------------------- De-dup-only UI -------------------
-        dedupe_box = QGroupBox("De-duplicate an Existing CSV → FINAL")
+        dedupe_box = QGroupBox("De-duplicate an Existing CSV → Final version")
         d_lay = QVBoxLayout(dedupe_box)
 
         # Input CSV
         drow1 = QHBoxLayout()
-        self.dedupe_input_csv = QLineEdit()
-        self.dedupe_input_csv.setPlaceholderText("Path to large CSV (e.g., checkpoint/raw/combined)")
+        self.cleanup_dedupe_input_csv = QLineEdit()
+        self.cleanup_dedupe_input_csv.setPlaceholderText("Path to large CSV (e.g., checkpoint/raw/combined)")
         btn_browse_dedupe_in = QPushButton("Browse…")
         drow1.addWidget(QLabel("Input CSV:"))
-        drow1.addWidget(self.dedupe_input_csv)
+        drow1.addWidget(self.cleanup_dedupe_input_csv)
         drow1.addWidget(btn_browse_dedupe_in)
         d_lay.addLayout(drow1)
 
         # Output folder + Save prefix
         drow2 = QHBoxLayout()
-        self.dedupe_output_dir = QLineEdit()
-        self.dedupe_output_dir.setPlaceholderText("Optional: output folder (default = same folder as input)")
+        self.cleanup_dedupe_output_dir = QLineEdit()
+        self.cleanup_dedupe_output_dir.setPlaceholderText("Optional: output folder (default = same folder as input)")
         btn_browse_dedupe_out = QPushButton("Choose…")
         drow2.addWidget(QLabel("Output Folder:"))
-        drow2.addWidget(self.dedupe_output_dir)
+        drow2.addWidget(self.cleanup_dedupe_output_dir)
         drow2.addWidget(btn_browse_dedupe_out)
         d_lay.addLayout(drow2)
 
         drow3 = QHBoxLayout()
-        self.dedupe_prefix = QLineEdit()
-        self.dedupe_prefix.setPlaceholderText("Optional save prefix (e.g., collabLearning)")
+        self.cleanup_dedupe_prefix = QLineEdit()
+        self.cleanup_dedupe_prefix.setPlaceholderText("Optional save prefix (e.g., collabLearning)")
         drow3.addWidget(QLabel("Save prefix:"))
-        drow3.addWidget(self.dedupe_prefix)
+        drow3.addWidget(self.cleanup_dedupe_prefix)
         d_lay.addLayout(drow3)
 
-        self.btn_run_dedupe_only = QPushButton("Run De-duplication (NO LLM TOKENS)")
-        d_lay.addWidget(self.btn_run_dedupe_only)
-
-        # Note about scale
-        d_lay.addWidget(QLabel(
-            "Note: handles very large CSVs, but RAM usage will scale with rows. "
-            "Default filename is 'search_results_final.csv'; if a prefix is provided, "
-            "output is placed in a prefix-named subfolder and renamed to '<prefix>_search_results_final.csv'."
-        ))
+        self.btn_cleanup_run_dedupe = QPushButton("Run De-duplication (NO LLM TOKENS)")
+        d_lay.addWidget(self.btn_cleanup_run_dedupe)
 
         layout.addWidget(dedupe_box)
+
+        # ------------------- Enrich Abstracts UI -------------------
+        enrich_box = QGroupBox("Enrich Abstracts & Repair Text (Run after De-dup)")
+        e_lay = QVBoxLayout(enrich_box)
+
+        erow1 = QHBoxLayout()
+        self.cleanup_enrich_input_csv = QLineEdit()
+        self.cleanup_enrich_input_csv.setPlaceholderText("Path to search_results_final.csv (deduplicated)")
+        btn_browse_enrich_in = QPushButton("Browse…")
+        erow1.addWidget(QLabel("Final Candidates CSV:"))
+        erow1.addWidget(self.cleanup_enrich_input_csv)
+        erow1.addWidget(btn_browse_enrich_in)
+        e_lay.addLayout(erow1)
+
+        erow2 = QHBoxLayout()
+        self.cleanup_enrich_output_dir = QLineEdit()
+        self.cleanup_enrich_output_dir.setPlaceholderText("Optional: output folder (default = same folder as input)")
+        btn_browse_enrich_out = QPushButton("Choose…")
+        erow2.addWidget(QLabel("Output Folder:"))
+        erow2.addWidget(self.cleanup_enrich_output_dir)
+        erow2.addWidget(btn_browse_enrich_out)
+        e_lay.addLayout(erow2)
+
+        erow3 = QHBoxLayout()
+        self.cleanup_enrich_prefix = QLineEdit()
+        self.cleanup_enrich_prefix.setPlaceholderText("Optional save prefix (e.g., collabLearning)")
+        erow3.addWidget(QLabel("Save prefix:"))
+        erow3.addWidget(self.cleanup_enrich_prefix)
+        e_lay.addLayout(erow3)
+
+        self.btn_cleanup_run_enrich = QPushButton("Run Enrich Abstracts & Repair (NO LLM TOKENS)")
+        e_lay.addWidget(self.btn_cleanup_run_enrich)
+
+        layout.addWidget(enrich_box)
 
         # ------------------- Zero-LLM Triage UI -------------------
         tri_box = QGroupBox("Triage Candidates (Zero-LLM) → Ready vs Requires Amendment")
         t_lay = QVBoxLayout(tri_box)
 
         trow1 = QHBoxLayout()
-        self.triage_input_csv = QLineEdit()
-        self.triage_input_csv.setPlaceholderText("Path to search_results_final.csv")
+        self.cleanup_triage_input_csv = QLineEdit()
+        self.cleanup_triage_input_csv.setPlaceholderText("Path to search_results_final.csv OR enriched.csv")
         btn_browse_tri_in = QPushButton("Browse…")
         trow1.addWidget(QLabel("Candidates CSV:"))
-        trow1.addWidget(self.triage_input_csv)
+        trow1.addWidget(self.cleanup_triage_input_csv)
         trow1.addWidget(btn_browse_tri_in)
         t_lay.addLayout(trow1)
 
         trow2 = QHBoxLayout()
-        self.triage_prefix = QLineEdit()
-        self.triage_prefix.setPlaceholderText("Save prefix (e.g., collabLearning)")
+        self.cleanup_triage_prefix = QLineEdit()
+        self.cleanup_triage_prefix.setPlaceholderText("Save prefix (e.g., collabLearning)")
         trow2.addWidget(QLabel("Save prefix:"))
-        trow2.addWidget(self.triage_prefix)
+        trow2.addWidget(self.cleanup_triage_prefix)
         t_lay.addLayout(trow2)
 
-        self.btn_run_triage = QPushButton("Run Triage (No LLM; cleans mojibake; splits files)")
-        t_lay.addWidget(self.btn_run_triage)
+        self.btn_cleanup_run_triage = QPushButton("Run Triage (No LLM; cleans mojibake; splits files)")
+        t_lay.addWidget(self.btn_cleanup_run_triage)
 
         layout.addWidget(tri_box)
+
+        # ------------------- Browse handlers -------------------
+        def _browse_file(target: QLineEdit, title: str):
+            path, _ = QFileDialog.getOpenFileName(self, title, "", "CSV Files (*.csv)")
+            if path:
+                target.setText(path)
+
+        def _browse_dir(target: QLineEdit, title: str):
+            path = QFileDialog.getExistingDirectory(self, title)
+            if path:
+                target.setText(path)
+
+        btn_browse_dedupe_in.clicked.connect(lambda: _browse_file(self.cleanup_dedupe_input_csv, "Select CSV to de-duplicate"))
+        btn_browse_dedupe_out.clicked.connect(lambda: _browse_dir(self.cleanup_dedupe_output_dir, "Choose output folder"))
+
+        btn_browse_enrich_in.clicked.connect(lambda: _browse_file(self.cleanup_enrich_input_csv, "Select FINAL CSV (deduplicated)"))
+        btn_browse_enrich_out.clicked.connect(lambda: _browse_dir(self.cleanup_enrich_output_dir, "Choose output folder"))
+
+        btn_browse_tri_in.clicked.connect(lambda: _browse_file(self.cleanup_triage_input_csv, "Select FINAL or Enriched CSV"))
+
+        # ------------------- Run handlers -------------------
+        def _run_cleanup_dedupe():
+            csv_path = self.cleanup_dedupe_input_csv.text().strip()
+            out_dir = self.cleanup_dedupe_output_dir.text().strip()
+            prefix = self.cleanup_dedupe_prefix.text().strip()
+
+            if not csv_path:
+                self.chat_log.append("⚠️ Please select an input CSV to de-duplicate.")
+                return
+
+            # If a prefix is provided and no explicit output dir, create a prefixed subfolder next to the input.
+            if prefix and not out_dir:
+                base_dir = os.path.dirname(os.path.abspath(csv_path))
+                out_dir = os.path.join(base_dir, prefix)
+
+            self.chat_log.append("⏳ De-duplication started (NO LLM TOKENS). An approval will pop up so you can set a timeout.")
+
+            def _task():
+                try:
+                    # Pass save_prefix directly; the task will name files like:
+                    #   <out_dir>/<prefix>_search_results_final.csv
+                    #   <out_dir>/<prefix>_search_results_final.progress.csv
+                    ok, msg = run_dedupe_only(
+                        input_csv_path=csv_path,
+                        output_dir=(out_dir or None),
+                        save_prefix=(prefix or None)
+                    )
+                    return ok, msg
+                except Exception as e:
+                    return False, f"De-duplication failed: {e}"
+
+            self.thread = TaskRunnerThread(_task)
+            self.thread.update_status.connect(self.chat_log.append)
+            self.thread.finished.connect(self.task_finished_with_result)
+            self._attach_busy(self.thread, "Dedupe: Processing CSV…")
+            self.thread.start()
+
+
+        self.btn_cleanup_run_dedupe.clicked.connect(_run_cleanup_dedupe)
+
+        def _run_cleanup_enrich():
+            input_csv = self.cleanup_enrich_input_csv.text().strip()
+            out_dir = self.cleanup_enrich_output_dir.text().strip() or None
+            prefix = self.cleanup_enrich_prefix.text().strip()
+
+            if not input_csv:
+                self.chat_log.append("⚠️ Please select the FINAL CSV (search_results_final.csv).")
+                return
+
+            self.chat_log.append("⏳ Enriching abstracts & repairing text (NO LLM TOKENS)…")
+
+            def _task():
+                try:
+                    from tasks.lit_enrich_candidates import enrich_candidates
+                except Exception as e:
+                    return False, f"Could not import enrichment task: {e}"
+                try:
+                    ok, msg = enrich_candidates(
+                        input_csv_path=input_csv,
+                        output_dir=out_dir,
+                        save_prefix=prefix or ""
+                    )
+                    return ok, msg
+                except Exception as e:
+                    return False, f"Enrichment failed: {e}"
+
+            self.thread = TaskRunnerThread(_task)
+            self.thread.update_status.connect(self.chat_log.append)
+            self.thread.finished.connect(self.task_finished_with_result)
+            self._attach_busy(self.thread, "Enriching & repairing…")
+            self.thread.start()
+
+        self.btn_cleanup_run_enrich.clicked.connect(_run_cleanup_enrich)
+
+        def _run_cleanup_triage():
+            input_csv = self.cleanup_triage_input_csv.text().strip()
+            prefix = self.cleanup_triage_prefix.text().strip() or "triage"
+
+            if not input_csv:
+                self.chat_log.append("⚠️ Please select a candidates CSV (FINAL or Enriched).")
+                return
+
+            self.chat_log.append("⏳ Running triage (Zero-LLM). This will clean obvious mojibake and split into ready/needs-amendment…")
+
+            def _task():
+                try:
+                    from tasks.lit_triage import run_triage
+                except Exception as e:
+                    return False, f"Could not import triage task: {e}"
+                return run_triage(input_csv=input_csv, save_prefix=prefix, write_md_preview=True)
+
+            self.thread = TaskRunnerThread(_task)
+            self.thread.update_status.connect(self.chat_log.append)
+            self.thread.finished.connect(self.task_finished_with_result)
+            self._attach_busy(self.thread, "Triaging candidates…")
+            self.thread.start()
+
+        self.btn_cleanup_run_triage.clicked.connect(_run_cleanup_triage)
+
+        # Add Tab
+        self.tabs.addTab(tab, "Lit Candidate Cleanup")
+
+
+    # =========================================================================== #
+    # -------------------------- Button Handlers -------------------------------- #
+    # =========================================================================== #
+    # -------------------------- Lit Relevance Tab ------------------------------ #
+    def create_lit_relevance_tab(self):
+        """
+        Stage C – Relevance scoring (CSV-2 → rank-ordered CSV for PDF pulls).
+        This tab is now focused ONLY on ranking + pulling PDFs.
+        """
+        from PySide6.QtWidgets import (
+            QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QTextEdit,
+            QPushButton, QFileDialog, QGroupBox
+        )
+
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
 
         # ------------------- Relevance UI -------------------
         ibox = QGroupBox("Rank / Relevance (CSV-2 → Ranked)")
@@ -1018,21 +1187,6 @@ class AilysGUI(QWidget):
         layout.addWidget(pull_box)
 
         # ------------------- Browse handlers -------------------
-        def browse_dedupe_in():
-            path, _ = QFileDialog.getOpenFileName(self, "Select CSV to de-duplicate", "", "CSV Files (*.csv)")
-            if path:
-                self.dedupe_input_csv.setText(path)
-
-        def browse_dedupe_out():
-            path = QFileDialog.getExistingDirectory(self, "Choose output folder")
-            if path:
-                self.dedupe_output_dir.setText(path)
-
-        def browse_triage_in():
-            path, _ = QFileDialog.getOpenFileName(self, "Select search_results_final.csv", "", "CSV Files (*.csv)")
-            if path:
-                self.triage_input_csv.setText(path)
-
         def browse_csv1():
             path, _ = QFileDialog.getOpenFileName(self, "Select prompt_to_keywords.csv", "", "CSV Files (*.csv)")
             if path:
@@ -1048,96 +1202,11 @@ class AilysGUI(QWidget):
             if path:
                 self.rel_ranked_csv.setText(path)
 
-        btn_browse_dedupe_in.clicked.connect(browse_dedupe_in)
-        btn_browse_dedupe_out.clicked.connect(browse_dedupe_out)
-        btn_browse_tri_in.clicked.connect(browse_triage_in)
         btn_browse_csv1.clicked.connect(browse_csv1)
         btn_browse_input.clicked.connect(browse_input)
         btn_browse_ranked.clicked.connect(browse_ranked)
 
         # ------------------- Run handlers -------------------
-        def _run_dedupe_only():
-            csv_path = self.dedupe_input_csv.text().strip()
-            out_dir = self.dedupe_output_dir.text().strip()
-            prefix = self.dedupe_prefix.text().strip()
-
-            if not csv_path:
-                self.chat_log.append("⚠️ Please select an input CSV to de-duplicate.")
-                return
-
-            # If prefix provided and no explicit out_dir, create a prefix-named subfolder next to the input.
-            if prefix and not out_dir:
-                base_dir = os.path.dirname(os.path.abspath(csv_path))
-                out_dir = os.path.join(base_dir, prefix)
-
-            self.chat_log.append("⏳ De-duplication started (NO LLM TOKENS).")
-
-            def _task():
-                try:
-                    # Run task
-                    ok, msg = run_dedupe_only(csv_path, out_dir or None)
-
-                    # If prefix supplied, rename final file to include the prefix
-                    if ok and prefix:
-                        dest_dir = out_dir or os.path.dirname(os.path.abspath(csv_path))
-                        try:
-                            os.makedirs(dest_dir, exist_ok=True)
-                        except Exception:
-                            pass
-                        final_default = os.path.join(dest_dir, "search_results_final.csv")
-                        final_pref = os.path.join(dest_dir, f"{prefix}_search_results_final.csv")
-                        try:
-                            if os.path.exists(final_default):
-                                # If a prefixed file already exists, overwrite it
-                                try:
-                                    if os.path.exists(final_pref):
-                                        os.remove(final_pref)
-                                except Exception:
-                                    pass
-                                os.replace(final_default, final_pref)
-                                msg = re.sub(r"(FINAL .*written:\s*)(.+?)(\s*\| rows=)", r"\1" + final_pref + r"\3",
-                                             msg)
-                        except Exception as e:
-                            msg += f"\n⚠️ Could not rename final CSV to prefixed name: {e}"
-
-                    return ok, msg
-                except Exception as e:
-                    return False, f"De-duplication failed: {e}"
-
-            self.thread = TaskRunnerThread(_task)
-            self.thread.update_status.connect(self.chat_log.append)
-            self.thread.finished.connect(self.task_finished_with_result)
-            self._attach_busy(self.thread, "Dedupe: Processing CSV…")
-            self.thread.start()
-
-        self.btn_run_dedupe_only.clicked.connect(_run_dedupe_only)
-
-        def _run_triage():
-            input_csv = self.triage_input_csv.text().strip()
-            prefix = self.triage_prefix.text().strip() or "relevance"
-            if not input_csv:
-                self.chat_log.append("⚠️ Please select a candidates CSV (search_results_final.csv).")
-                return
-
-            self.chat_log.append(
-                "⏳ Running triage (Zero-LLM). This will clean obvious mojibake and split into ready/needs-amendment…")
-
-            def _task():
-                try:
-                    from tasks.lit_triage import run_triage
-                except Exception as e:
-                    return False, f"Could not import triage task: {e}"
-                ok, msg = run_triage(input_csv=input_csv, save_prefix=prefix, write_md_preview=True)
-                return ok, msg
-
-            self.thread = TaskRunnerThread(_task)
-            self.thread.update_status.connect(self.chat_log.append)
-            self.thread.finished.connect(self.task_finished_with_result)
-            self._attach_busy(self.thread, "Triaging candidates…")
-            self.thread.start()
-
-        self.btn_run_triage.clicked.connect(_run_triage)
-
         def _run_rel():
             csv1 = self.rel_csv1_path.text().strip()
             if not csv1:
@@ -1175,7 +1244,6 @@ class AilysGUI(QWidget):
                 except Exception as e:
                     return False, f"Could not import relevance task: {e}"
 
-                # Pass save_prefix if the task supports it; fall back gracefully otherwise.
                 kwargs = dict(
                     csv1_path=csv1,
                     collected_csv_path=input_csv,
@@ -1189,7 +1257,6 @@ class AilysGUI(QWidget):
                 try:
                     ok, msg = rel_run(**kwargs)
                 except TypeError as te:
-                    # Retry without save_prefix if the backend doesn't accept it yet
                     if "save_prefix" in kwargs:
                         kwargs.pop("save_prefix", None)
                         ok, msg = rel_run(**kwargs)
@@ -1240,6 +1307,7 @@ class AilysGUI(QWidget):
 
         # Renamed tab:
         self.tabs.addTab(tab, "Lit Rank/Pull")
+
 
     def run_ls_keywords(self):
         """Stage A – Prompt → Keywords (CSV-1)."""

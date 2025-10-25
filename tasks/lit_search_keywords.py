@@ -136,16 +136,23 @@ def run(
     researcher: str = " ",
     run_id: Optional[str] = None,
     clarifications_csv_path: Optional[str] = None,
-    save_prefix: Optional[str] = None,   # <— NEW: optional save prefix for folder + filename
+    save_prefix: Optional[str] = None,   # optional save prefix for folder + filename
+    root: Optional[str] = None,          # <- accepted for backward compatibility; unused here
+    **task_kwargs,                        # <- swallow any extra runner args safely
 ):
     """
     Stage A – Prompt → Keywords (CSV-1).
     - file_path: unused (kept for TaskManager compatibility)
     - guidance: the research prompt
     - clarifications_csv_path: if provided, read last row to pick up 'clarifications'
-    - save_prefix: when provided, CSV is saved under a <paths['csv']>/<prefix>/ folder
-                   and the filename is <prefix>_prompt_to_keywords.csv
+    - save_prefix: when provided, the run *root* is tagged as <timestamp>_<prefix>, and
+                   the CSV is saved under:
+                     .../lit_runs/<timestamp>_<prefix>/prompt to keyword outputs/<prefix>/<prefix>_prompt_to_keywords.csv
+    - root: accepted for backward compatibility with older runners (ignored)
+    - **task_kwargs: swallow any additional runner-provided kwargs safely (ignored)
     """
+
+
     prompt = (guidance or "").strip()
     if not prompt and not clarifications_csv_path:
         return False, "No prompt provided."
@@ -176,24 +183,28 @@ def run(
 
     parsed = _parse_json_block(llm_reply)
 
-    # Write CSV-1 (support save_prefix for paths & naming)
+    # Write CSV-1 (prefix-aware: tag the run root and use a clear stage folder)
     rid = run_id or make_run_id()
     paths = run_dirs(rid)  # typically yields {'csv': ..., 'raw': ..., 'logs': ...}
-    base_csv_dir = paths["csv"]
 
-    # Default location & name
-    out_dir = base_csv_dir
-    out_name = "prompt_to_keywords.csv"
+    # run_dirs(rid)['csv'] is .../lit_runs/<timestamp>/csv — we want the run root:
+    run_root = os.path.dirname(paths["csv"])  # .../lit_runs/<timestamp>
 
-    # If a prefix is provided, nest inside a prefix folder and prefix the filename
-    if save_prefix:
-        # sanitize a little: keep simple filesystem-friendly name
-        safe_prefix = re.sub(r"[^\w\-\.]+", "_", save_prefix.strip())
-        out_dir = os.path.join(base_csv_dir, safe_prefix)
-        out_name = f"{safe_prefix}_prompt_to_keywords.csv"
+    # Sanitize and apply prefix to the run root folder name
+    safe_prefix = re.sub(r"[^\w\-.]+", "_", (save_prefix or "").strip()) if save_prefix else ""
+    prefixed_root = f"{run_root}_{safe_prefix}" if safe_prefix else run_root
 
-    os.makedirs(out_dir, exist_ok=True)
-    out_csv = os.path.join(out_dir, out_name)
+    # Stage folder requested: "prompt to keyword outputs", with an extra <prefix> level
+    # Final layout (when save_prefix provided):
+    #   .../lit_runs/<timestamp>_<prefix>/prompt to keyword outputs/<prefix>/<prefix>_prompt_to_keywords.csv
+    stage_dir = os.path.join(prefixed_root, "prompt to keyword outputs")
+    if safe_prefix:
+        stage_dir = os.path.join(stage_dir, safe_prefix)
+
+    out_name = f"{safe_prefix + '_' if safe_prefix else ''}prompt_to_keywords.csv"
+    os.makedirs(stage_dir, exist_ok=True)
+    out_csv = os.path.join(stage_dir, out_name)
+
 
     now = datetime.datetime.utcnow().isoformat()
     write_csv_row(out_csv, {

@@ -16,6 +16,25 @@ from typing import Optional, Dict, List, Tuple
 from core.lit.utils import to_list, run_dirs
 import core.approval_queue as approvals
 
+def _infer_prefixed_run_root(csv_path: str) -> str | None:
+    """
+    Walk up from csv_path to find a directory named like
+    YYYY-MM-DDTHH-MM-SSZ or YYYY-MM-DDTHH-MM-SSZ_<prefix>, and return that path.
+    If none found, return None.
+    """
+    try:
+        p = os.path.abspath(csv_path or "")
+        d = os.path.dirname(p)
+        stamp_re = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z(?:_.+)?$')
+        while d and d != os.path.dirname(d):
+            base = os.path.basename(d)
+            if stamp_re.match(base):
+                return d
+            d = os.path.dirname(d)
+    except Exception:
+        pass
+    return None
+
 
 DEBUG_LIT = os.getenv("LIT_DEBUG", "1") != "0"
 
@@ -1262,7 +1281,18 @@ def run(
     csv1_path: path to prompt_to_keywords.csv (from Stage A)
     per_source: max items per engine per query (soft limit)
     include: subset of engines to use; default = all
+
+    Foldering rules:
+      • If csv1_path is under .../lit_runs/<timestamp>_<prefix>/prompt to keyword outputs/<prefix>/,
+        the collection outputs will be written under that SAME prefixed run root:
+          <timestamp>_<prefix>/candidate collection output/<prefix>/attempt_<UTC>/
+          <timestamp>_<prefix>/candidate collection logs/<prefix>/attempt_<UTC>/
+          <timestamp>_<prefix>/candidate collection raw/<prefix>/attempt_<UTC>/
+      • If csv1_path does not live under a prefixed run root, we fall back to
+        .../lit_runs/<timestamp> (from run_dirs), and append _<save_prefix> if provided.
     """
+
+
     if not os.path.exists(csv1_path):
         return False, f"CSV-1 not found: {csv1_path}"
 
@@ -1303,28 +1333,52 @@ def run(
     paths.setdefault("raw", os.path.join(default_root, "raw"))
     paths.setdefault("logs", os.path.join(default_root, "logs"))
 
-    # ---- optional save prefix: nest each output root under <prefix>/ ----
-    safe_prefix = None
-    if save_prefix:
-        safe_prefix = re.sub(r"[^\w\-.]+", "_", save_prefix.strip())
-        for key in ("csv", "raw", "logs"):
-            try:
-                paths[key] = os.path.join(paths[key], safe_prefix)
-            except Exception as e:
-                print(f"[io] could not compose prefixed dir for {key}: {e}")
+    # Preferred: derive the *prefixed* run root from the actual CSV location the user loaded.
+    inferred_root = _infer_prefixed_run_root(csv1_path)
+    # sanitize the provided prefix (if any)
+    safe_prefix = re.sub(r"[^\w\-.]+", "_", (save_prefix or "").strip()) if save_prefix else ""
 
-    # ensure dirs
+    if inferred_root:
+        # Use the prefixed root that the CSV lives under (e.g., .../2025-10-24T19-40-30Z_hat-colearning)
+        prefixed_root = inferred_root
+
+        # If no explicit save_prefix was passed, try to derive it from the root folder name.
+        # Example folder name: 2025-10-24T19-40-30Z_hat-colearning  -> prefix = hat-colearning
+        if not safe_prefix:
+            m = re.match(r'^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z_(.+)$', os.path.basename(inferred_root))
+            if m and m.group(1).strip():
+                safe_prefix = m.group(1).strip()
+    else:
+        # Fallback to the un-prefixed run root from run_dirs(), and append _<prefix> for clarity if provided.
+        run_root = os.path.dirname(paths["csv"])  # typically .../lit_runs/<timestamp>
+        prefixed_root = f"{run_root}_{safe_prefix}" if safe_prefix else run_root
+
+    # Stage-specific roots under the (prefixed) run root — clear names instead of generic csv/raw/logs
+    stage_csv_root  = os.path.join(prefixed_root, "candidate collection output")
+    stage_logs_root = os.path.join(prefixed_root, "candidate collection logs")
+    stage_raw_root  = os.path.join(prefixed_root, "candidate collection raw")
+
+    # If a prefix exists, add it as a subfolder under each stage root (for visual grouping).
+    if safe_prefix:
+        stage_csv_root  = os.path.join(stage_csv_root,  safe_prefix)
+        stage_logs_root = os.path.join(stage_logs_root, safe_prefix)
+        stage_raw_root  = os.path.join(stage_raw_root,  safe_prefix)
+
+    # Replace the generic paths with stage roots
+    paths["csv"]  = stage_csv_root
+    paths["logs"] = stage_logs_root
+    paths["raw"]  = stage_raw_root
+
+    # Ensure stage directories exist
     for key in ("csv", "raw", "logs"):
         try:
             os.makedirs(paths[key], exist_ok=True)
         except Exception as e:
-            print(f"[io] could not create output dir for {key}: {e}")
+            print(f"[io] could not create stage dir for {key}: {e}")
 
     # Create a fresh, unique subfolder per invocation to avoid overwrites.
-    # Example: runs/<run_id>/attempt_2025-10-21_15-03-42
     attempt_stamp = datetime.datetime.utcnow().strftime("attempt_%Y-%m-%d_%H-%M-%S")
     for key in ("csv", "raw", "logs"):
-        # Re-root each path into a unique attempt folder
         base_dir = paths[key]
         unique_dir = os.path.join(base_dir, attempt_stamp)
         try:
@@ -1332,7 +1386,13 @@ def run(
             paths[key] = unique_dir
         except Exception as e:
             print(f"[io] could not create unique attempt dir for {key}: {e}")
-    _dbg(f"Writing outputs to unique attempt folder: csv={paths['csv']} raw={paths['raw']} logs={paths['logs']}")
+
+    _dbg(
+        "Writing outputs to unique attempt folder: "
+        f"csv={paths['csv']} raw={paths['raw']} logs={paths['logs']}"
+    )
+
+
 
     # Helper: apply prefix to filenames as well as folders
     def _pf(name: str) -> str:
@@ -1377,9 +1437,9 @@ def run(
     out_partial = os.path.join(paths["csv"], _pf("search_results_partial.csv"))
     _ensure_csv2_header(out_partial)
 
-    # Streaming enrichment (as abstracts get filled)
-    out_enriched = os.path.join(paths["csv"], _pf("search_results_enriched_partial.csv"))
-    _ensure_csv2_header(out_enriched)
+    # # Streaming enrichment (as abstracts get filled)
+    # out_enriched = os.path.join(paths["csv"], _pf("search_results_enriched_partial.csv"))
+    # _ensure_csv2_header(out_enriched)
 
     engines = include or ["OpenAlex","Crossref","arXiv","PubMed","SemanticScholar"]
     collected: List[Dict[str,str]] = []
@@ -1429,45 +1489,45 @@ def run(
         print("[hint] NCBI_API_KEY not set; PubMed E-utilities may be slower/limited.")
 
 
-    def _enrich_missing_abstracts(rows: List[Dict[str, str]]) -> None:
-        """
-        Fills missing/short abstracts in-place using DOI/PMID lookups and a light scrape fallback.
-        Streams progress to 'search_results_enriched_partial.csv'.
-        """
-        for r in rows:
-            # Clean title/venue that may have weird chars
-            r["title"] = _clean_text(r.get("title", ""))
-            r["venue"] = _clean_text(r.get("venue", ""))
-            r["authors|;|"] = _clean_text(r.get("authors|;|", ""))
-
-            # If an abstract exists and looks real, keep it
-            existing = _clean_text(r.get("abstract", ""))
-            if existing and len(existing) >= 120:
-                r["abstract"] = existing
-                continue
-
-            doi = (r.get("doi") or "").strip().lower()
-            url = r.get("url") or ""
-            new_abs = None
-
-            # Try DOI-based lookups first
-            if doi:
-                new_abs = _fetch_abstract_by_doi(doi)
-
-            # PubMed by PMID if present in URL (or if Crossref mapped it in DOI lookup path)
-            if not new_abs:
-                pmid = _extract_pmid_from_url(url)
-                if pmid:
-                    new_abs = _fetch_pubmed_abstract(pmid)
-
-            # Fallback: quick page scrape
-            if (not new_abs) and url:
-                new_abs = _scrape_page_for_abstract(url)
-
-            if new_abs:
-                r["abstract"] = new_abs
-                # Stream this improved row so you can see enrichment progress
-                _write_csv2(out_enriched, [r])
+    # def _enrich_missing_abstracts(rows: List[Dict[str, str]]) -> None:
+    #     """
+    #     Fills missing/short abstracts in-place using DOI/PMID lookups and a light scrape fallback.
+    #     Streams progress to 'search_results_enriched_partial.csv'.
+    #     """
+    #     for r in rows:
+    #         # Clean title/venue that may have weird chars
+    #         r["title"] = _clean_text(r.get("title", ""))
+    #         r["venue"] = _clean_text(r.get("venue", ""))
+    #         r["authors|;|"] = _clean_text(r.get("authors|;|", ""))
+    #
+    #         # If an abstract exists and looks real, keep it
+    #         existing = _clean_text(r.get("abstract", ""))
+    #         if existing and len(existing) >= 120:
+    #             r["abstract"] = existing
+    #             continue
+    #
+    #         doi = (r.get("doi") or "").strip().lower()
+    #         url = r.get("url") or ""
+    #         new_abs = None
+    #
+    #         # Try DOI-based lookups first
+    #         if doi:
+    #             new_abs = _fetch_abstract_by_doi(doi)
+    #
+    #         # PubMed by PMID if present in URL (or if Crossref mapped it in DOI lookup path)
+    #         if not new_abs:
+    #             pmid = _extract_pmid_from_url(url)
+    #             if pmid:
+    #                 new_abs = _fetch_pubmed_abstract(pmid)
+    #
+    #         # Fallback: quick page scrape
+    #         if (not new_abs) and url:
+    #             new_abs = _scrape_page_for_abstract(url)
+    #
+    #         if new_abs:
+    #             r["abstract"] = new_abs
+    #             # Stream this improved row so you can see enrichment progress
+    #             _write_csv2(out_enriched, [r])
 
 
     # ---- Approval gate (network-only; NO LLM TOKENS) -------------------------
@@ -1812,10 +1872,10 @@ def run(
 
         msg = (
             f"{'⛔ ' if interrupted else ''}RAW (all rows) written/appended: {out_all} | rows≈{raw_rows}\n"
-            f"   De-dup is now a separate step. Use the GUI 'De-duplicate' button or call:\n"
-            f"   run_dedupe_only(input_csv_path='{out_all}', output_dir='{paths['csv']}')\n"
-            f"   (A placeholder exists at: {out_final_placeholder}, but it is intentionally empty until de-dup runs.)"
+            f"   Next: Run De-duplicate (Cleanup tab) to create FINAL, then run Enrich Abstracts on that FINAL.\n"
+            f"   Placeholder FINAL: {out_final_placeholder} (empty until de-dup writes it)."
         )
+
         print(msg)
         try:
             _write_log_line(
@@ -1847,11 +1907,9 @@ def run(
 
         ok_collect = True
 
-        # Enrichment (non-LLM): fill short/missing abstracts
-        try:
-            _enrich_missing_abstracts(collected)
-        except Exception as e:
-            print(f"[enrich] non-fatal error: {e}")
+        # (enrichment moved to standalone task; collector stops fast)
+        print("[collect] Skipping enrichment; run it later from the Cleanup tab.")
+
 
     finally:
         # No matter what (STOP, error, normal finish), produce FINAL.
@@ -1859,55 +1917,15 @@ def run(
 
     return (ok_collect and _ok), _msg
 
-def run_dedupe_only(input_csv_path: str, output_dir: Optional[str] = None) -> Tuple[bool, str]:
+def run_dedupe_only(input_csv_path: str, output_dir: Optional[str] = None, save_prefix: Optional[str] = None) -> Tuple[bool, str]:
     """
-    Utility entrypoint to dedupe/merge an **existing** CSV (raw/checkpoint/combined),
-    writing a fresh 'search_results_final.csv' in output_dir (or alongside input).
-
-    - input_csv_path: CSV with columns compatible with CSV2_HEADER.
-    - output_dir: optional folder to write final CSV; defaults to dirname(input_csv_path).
+    DEPRECATED: moved to tasks.lit_dedupe.run.
+    Kept for compatibility. Supports the same behavior but delegates.
     """
-    if not os.path.exists(input_csv_path):
-        return False, f"Input CSV not found: {input_csv_path}"
-
     try:
-        rows: List[Dict[str, str]] = []
-        with open(input_csv_path, "r", encoding="utf-8") as f:
-            r = csv.DictReader(f)
-            for row in r:
-                rows.append(dict(row))
+        from tasks.lit_dedupe import run as _dedupe_run
     except Exception as e:
-        return False, f"Could not read CSV: {e}"
+        return False, f"Could not import tasks.lit_dedupe: {e}"
+    return _dedupe_run(input_csv_path=input_csv_path, output_dir=output_dir, save_prefix=save_prefix)
 
-    # Dedupe/merge with fallback
-    try:
-        final_rows = _merge_dedupe(rows)
-    except Exception as e:
-        print(f"[dedupe_only] merge-dedupe failed, falling back to simple dedupe: {e}")
-        try:
-            final_rows = _dedupe(rows)
-        except Exception as e2:
-            print(f"[dedupe_only] simple dedupe also failed: {e2}")
-            final_rows = list(rows)
-
-    out_dir = output_dir or os.path.dirname(os.path.abspath(input_csv_path)) or "."
-    try:
-        os.makedirs(out_dir, exist_ok=True)
-    except Exception:
-        pass
-    out_final = os.path.join(out_dir, "search_results_final.csv")
-
-    try:
-        if os.path.exists(out_final):
-            os.remove(out_final)
-    except Exception:
-        pass
-
-    try:
-        _ensure_csv2_header(out_final)
-        _write_csv2(out_final, final_rows)
-    except Exception as e:
-        return False, f"Failed to write final CSV: {e}"
-
-    return True, f"FINAL (dedup+merged) written: {out_final} | rows={len(final_rows)}"
 
